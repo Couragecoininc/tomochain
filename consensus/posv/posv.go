@@ -229,10 +229,10 @@ type Posv struct {
 	EnableCache   bool
 	BlockSigners  *lru.Cache
 	Votes         *lru.Cache
-	HookReward    func(chain consensus.ChainReader, state *state.StateDB, header *types.Header) (error, map[string]interface{})
-	HookPenalty   func(chain consensus.ChainReader, blockNumberEpoc uint64) ([]common.Address, error)
-	HookValidator func(header *types.Header, signers []common.Address) ([]byte, error)
-	HookVerifyMNs func(header *types.Header, signers []common.Address) error
+	HookReward    func(state *state.StateDB, chain consensus.ChainReader, header *types.Header) (error, map[string]interface{})
+	HookPenalty   func(state *state.StateDB, chain consensus.ChainReader, blockNumberEpoc uint64) ([]common.Address, error)
+	HookValidator func(state *state.StateDB, header *types.Header, signers []common.Address) ([]byte, error)
+	HookVerifyMNs func(state *state.StateDB, header *types.Header, signers []common.Address) error
 }
 
 // New creates a PoSV proof-of-stake-voting consensus engine with the initial
@@ -271,20 +271,20 @@ func (c *Posv) Author(header *types.Header) (common.Address, error) {
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules.
-func (c *Posv) VerifyHeader(chain consensus.ChainReader, header *types.Header, fullVerify bool) error {
-	return c.verifyHeaderWithCache(chain, header, nil, fullVerify)
+func (c *Posv) VerifyHeader(chain consensus.ChainReader, state *state.StateDB, header *types.Header, fullVerify bool) error {
+	return c.verifyHeaderWithCache(chain, state, header, nil, fullVerify)
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers. The
 // method returns a quit channel to abort the operations and a results channel to
 // retrieve the async verifications (the order is that of the input slice).
-func (c *Posv) VerifyHeaders(chain consensus.ChainReader, headers []*types.Header, fullVerifies []bool) (chan<- struct{}, <-chan error) {
+func (c *Posv) VerifyHeaders(chain consensus.ChainReader, state *state.StateDB, headers []*types.Header, fullVerifies []bool) (chan<- struct{}, <-chan error) {
 	abort := make(chan struct{})
 	results := make(chan error, len(headers))
 
 	go func() {
 		for i, header := range headers {
-			err := c.verifyHeaderWithCache(chain, header, headers[:i], fullVerifies[i])
+			err := c.verifyHeaderWithCache(chain, state, header, headers[:i], fullVerifies[i])
 
 			select {
 			case <-abort:
@@ -296,12 +296,12 @@ func (c *Posv) VerifyHeaders(chain consensus.ChainReader, headers []*types.Heade
 	return abort, results
 }
 
-func (c *Posv) verifyHeaderWithCache(chain consensus.ChainReader, header *types.Header, parents []*types.Header, fullVerify bool) error {
+func (c *Posv) verifyHeaderWithCache(chain consensus.ChainReader, state *state.StateDB, header *types.Header, parents []*types.Header, fullVerify bool) error {
 	_, check := c.verifiedHeaders.Get(header.Hash())
 	if check {
 		return nil
 	}
-	err := c.verifyHeader(chain, header, parents, fullVerify)
+	err := c.verifyHeader(chain, state, header, parents, fullVerify)
 	if err == nil {
 		c.verifiedHeaders.Add(header.Hash(), true)
 	}
@@ -312,7 +312,7 @@ func (c *Posv) verifyHeaderWithCache(chain consensus.ChainReader, header *types.
 // caller may optionally pass in a batch of parents (ascending order) to avoid
 // looking those up from the database. This is useful for concurrently verifying
 // a batch of new headers.
-func (c *Posv) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header, fullVerify bool) error {
+func (c *Posv) verifyHeader(chain consensus.ChainReader, state *state.StateDB, header *types.Header, parents []*types.Header, fullVerify bool) error {
 	if header.Number == nil {
 		return errUnknownBlock
 	}
@@ -367,14 +367,14 @@ func (c *Posv) verifyHeader(chain consensus.ChainReader, header *types.Header, p
 		return err
 	}
 	// All basic checks passed, verify cascading fields
-	return c.verifyCascadingFields(chain, header, parents, fullVerify)
+	return c.verifyCascadingFields(chain, state, header, parents, fullVerify)
 }
 
 // verifyCascadingFields verifies all the header fields that are not standalone,
 // rather depend on a batch of previous headers. The caller may optionally pass
 // in a batch of parents (ascending order) to avoid looking those up from the
 // database. This is useful for concurrently verifying a batch of new headers.
-func (c *Posv) verifyCascadingFields(chain consensus.ChainReader, header *types.Header, parents []*types.Header, fullVerify bool) error {
+func (c *Posv) verifyCascadingFields(chain consensus.ChainReader, state *state.StateDB, header *types.Header, parents []*types.Header, fullVerify bool) error {
 	// The genesis block is the always valid dead-end
 	number := header.Number.Uint64()
 	if number == 0 {
@@ -402,7 +402,7 @@ func (c *Posv) verifyCascadingFields(chain consensus.ChainReader, header *types.
 	if number%c.config.Epoch == 0 {
 		penPenalties := []common.Address{}
 		if c.HookPenalty != nil {
-			penPenalties, err = c.HookPenalty(chain, number)
+			penPenalties, err = c.HookPenalty(state, chain, number)
 			if err != nil {
 				return err
 			}
@@ -427,7 +427,7 @@ func (c *Posv) verifyCascadingFields(chain consensus.ChainReader, header *types.
 			return errInvalidCheckpointSigners
 		}
 		if c.HookVerifyMNs != nil {
-			err := c.HookVerifyMNs(header, signers)
+			err := c.HookVerifyMNs(state, header, signers)
 			if err != nil {
 				return err
 			}
@@ -549,7 +549,7 @@ func (c *Posv) snapshot(chain consensus.ChainReader, number uint64, hash common.
 		// If we're at block zero, make a snapshot
 		if number == 0 {
 			genesis := chain.GetHeaderByNumber(0)
-			if err := c.VerifyHeader(chain, genesis, true); err != nil {
+			if err := c.VerifyHeader(chain, nil, genesis, true); err != nil {
 				return nil, err
 			}
 			signers := make([]common.Address, (len(genesis.Extra)-extraVanity-extraSeal)/common.AddressLength)
@@ -739,7 +739,7 @@ func (c *Posv) GetValidator(creator common.Address, chain consensus.ChainReader,
 
 // Prepare implements consensus.Engine, preparing all the consensus fields of the
 // header for running the transactions on top.
-func (c *Posv) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (c *Posv) Prepare(chain consensus.ChainReader, state *state.StateDB, header *types.Header) error {
 	// If the block isn't a checkpoint, cast a random vote (good enough for now)
 	header.Coinbase = common.Address{}
 	header.Nonce = types.BlockNonce{}
@@ -786,7 +786,7 @@ func (c *Posv) Prepare(chain consensus.ChainReader, header *types.Header) error 
 	masternodes := snap.GetSigners()
 	if number > 0 && number%c.config.Epoch == 0 {
 		if c.HookPenalty != nil {
-			penMasternodes, err := c.HookPenalty(chain, number)
+			penMasternodes, err := c.HookPenalty(state, chain, number)
 			if err != nil {
 				return err
 			}
@@ -809,7 +809,7 @@ func (c *Posv) Prepare(chain consensus.ChainReader, header *types.Header) error 
 			header.Extra = append(header.Extra, masternode[:]...)
 		}
 		if c.HookValidator != nil {
-			validators, err := c.HookValidator(header, masternodes)
+			validators, err := c.HookValidator(state, header, masternodes)
 			if err != nil {
 				return err
 			}
@@ -865,7 +865,7 @@ func (c *Posv) Finalize(chain consensus.ChainReader, header *types.Header, state
 			c.EnableCache = true
 		}
 
-		err, rewards := c.HookReward(chain, state, header)
+		err, rewards := c.HookReward(state, chain, header)
 		if err != nil {
 			return nil, err
 		}
