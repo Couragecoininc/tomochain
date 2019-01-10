@@ -25,11 +25,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/state"
 )
 
@@ -245,7 +245,11 @@ type BzzPeer struct {
 }
 
 func NewBzzPeer(p *protocols.Peer) *BzzPeer {
-	return &BzzPeer{Peer: p, BzzAddr: NewAddr(p.Node())}
+	// discover.NewNode(p.ID(), p.RemoteAddr().Network
+
+	node := discover.NewNode(p.ID(), net.IP{127, 0, 0, 1}, 30303, 30303)
+	// node := discover.NewNode(p.ID(), realaddr.IP, uint16(realaddr.Port), uint16(realaddr.Port))
+	return &BzzPeer{Peer: p, BzzAddr: NewAddr(node)}
 }
 
 // ID returns the peer's underlay node identifier.
@@ -348,11 +352,12 @@ func (a *BzzAddr) Under() []byte {
 
 // ID returns the node identifier in the underlay.
 func (a *BzzAddr) ID() discover.NodeID {
-	n, err := enode.ParseV4(string(a.UAddr))
+	// n, err := enode.ParseV4(string(a.UAddr))
+	n, err := discover.ParseNode(string(a.UAddr))
 	if err != nil {
 		return discover.NodeID{}
 	}
-	return n.ID()
+	return n.ID
 }
 
 // Update updates the underlay address of a peer record
@@ -371,11 +376,20 @@ func RandomAddr() *BzzAddr {
 	if err != nil {
 		panic("unable to generate key")
 	}
-	node := enode.NewV4(&key.PublicKey, net.IP{127, 0, 0, 1}, 30303, 30303)
+	// node := enode.NewV4(&key.PublicKey, net.IP{127, 0, 0, 1}, 30303, 30303)
+	pubkeyID := discover.PubkeyID(&key.PublicKey)
+	node := discover.NewNode(pubkeyID, net.IP{127, 0, 0, 1}, 30303, 30303)
+
 	return NewAddr(node)
 }
 
 // NewAddr constucts a BzzAddr from a node record.
-func NewAddr(node *enode.Node) *BzzAddr {
-	return &BzzAddr{OAddr: node.ID().Bytes(), UAddr: []byte(node.String())}
+func NewAddr(node *discover.Node) *BzzAddr {
+	// return &BzzAddr{OAddr: node.ID().Bytes(), UAddr: []byte(node.String())}
+	return &BzzAddr{OAddr: node.ID.Bytes(), UAddr: []byte(node.String())}
+}
+
+// NewAddr constucts a BzzAddr from a node record.
+func NewAddrFromBytes(oAddr, uAddr []byte) *BzzAddr {
+	return &BzzAddr{OAddr: oAddr, UAddr: uAddr}
 }

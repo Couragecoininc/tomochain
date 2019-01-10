@@ -30,12 +30,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/pot"
 	"github.com/ethereum/go-ethereum/swarm/storage"
@@ -373,7 +373,7 @@ func (p *Pss) getHandlers(topic Topic) map[*handler]bool {
 // Check if address partially matches
 // If yes, it CAN be for us, and we process it
 // Only passes error to pss protocol handler if payload is not valid pssmsg
-func (p *Pss) handlePssMsg(ctx context.Context, msg interface{}) error {
+func (p *Pss) handlePssMsg(msg interface{}) error {
 	metrics.GetOrRegisterCounter("pss.handlepssmsg", nil).Inc(1)
 	pssmsg, ok := msg.(*PssMsg)
 	if !ok {
@@ -810,7 +810,7 @@ func (p *Pss) SendSym(symkeyid string, topic Topic, msg []byte) error {
 //
 // Fails if the key id does not match any in of the stored public keys
 func (p *Pss) SendAsym(pubkeyid string, topic Topic, msg []byte) error {
-	if _, err := crypto.UnmarshalPubkey(common.FromHex(pubkeyid)); err != nil {
+	if pk := crypto.ToECDSAPub(common.FromHex(pubkeyid)); pk == nil {
 		return fmt.Errorf("Cannot unmarshal pubkey: %x", pubkeyid)
 	}
 	p.pubKeyPoolMu.Lock()
@@ -849,8 +849,8 @@ func (p *Pss) send(to []byte, topic Topic, msg []byte, asymmetric bool, key []by
 		Padding:  padding,
 	}
 	if asymmetric {
-		pk, err := crypto.UnmarshalPubkey(key)
-		if err != nil {
+		pk := crypto.ToECDSAPub(key)
+		if pk == nil {
 			return fmt.Errorf("Cannot unmarshal pubkey: %x", key)
 		}
 		wparams.Dst = pk
@@ -915,7 +915,7 @@ func sendMsg(p *Pss, sp *network.Peer, msg *PssMsg) bool {
 	pp := p.fwdPool[sp.Info().ID]
 	p.fwdPoolMu.RUnlock()
 
-	err := pp.Send(context.TODO(), msg)
+	err := pp.Send(msg)
 	if err != nil {
 		metrics.GetOrRegisterCounter("pss.pp.send.error", nil).Inc(1)
 		log.Error(err.Error())

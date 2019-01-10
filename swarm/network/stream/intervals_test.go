@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"testing"
@@ -61,9 +62,10 @@ func testIntervals(t *testing.T, live bool, history *Range, skipCheck bool) {
 
 	sim := simulation.New(map[string]simulation.ServiceFunc{
 		"intervalsStreamer": func(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-			n := ctx.Config.Node()
+			// n := ctx.Config.Node()
+			n := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(n)
-			store, datadir, err := createTestLocalStorageForID(n.ID(), addr)
+			store, datadir, err := createTestLocalStorageForID(n.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -85,7 +87,7 @@ func testIntervals(t *testing.T, live bool, history *Range, skipCheck bool) {
 				Retrieval: RetrievalDisabled,
 				Syncing:   SyncingRegisterOnly,
 				SkipCheck: skipCheck,
-			}, nil)
+			})
 			bucket.Store(bucketKeyRegistry, r)
 
 			r.RegisterClientFunc(externalStreamName, func(p *Peer, t string, live bool) (Client, error) {

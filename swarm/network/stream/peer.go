@@ -23,9 +23,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
-	"github.com/ethereum/go-ethereum/log"
 	pq "github.com/ethereum/go-ethereum/swarm/network/priorityqueue"
 	"github.com/ethereum/go-ethereum/swarm/network/stream/intervals"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
@@ -68,8 +68,8 @@ type Peer struct {
 }
 
 type WrappedPriorityMsg struct {
-	Context context.Context
-	Msg     interface{}
+	// Context context.Context
+	Msg interface{}
 }
 
 // NewPeer is the constructor for Peer
@@ -86,7 +86,7 @@ func NewPeer(peer *protocols.Peer, streamer *Registry) *Peer {
 	ctx, cancel := context.WithCancel(context.Background())
 	go p.pq.Run(ctx, func(i interface{}) {
 		wmsg := i.(WrappedPriorityMsg)
-		err := p.Send(wmsg.Context, wmsg.Msg)
+		err := p.Send(wmsg.Msg)
 		if err != nil {
 			log.Error("Message send error, dropping peer", "peer", p.ID(), "err", err)
 			p.Drop(err)
@@ -151,21 +151,21 @@ func (p *Peer) Deliver(ctx context.Context, chunk storage.Chunk, priority uint8,
 		}
 		spanName += ".retrieval"
 	}
-	ctx, sp = spancontext.StartSpan(
-		ctx,
+	_, sp = spancontext.StartSpan(
+		// ctx,
 		spanName)
 	defer sp.Finish()
 
-	return p.SendPriority(ctx, msg, priority)
+	return p.SendPriority(msg, priority)
 }
 
 // SendPriority sends message to the peer using the outgoing priority queue
-func (p *Peer) SendPriority(ctx context.Context, msg interface{}, priority uint8) error {
+func (p *Peer) SendPriority(msg interface{}, priority uint8) error {
 	defer metrics.GetOrRegisterResettingTimer(fmt.Sprintf("peer.sendpriority_t.%d", priority), nil).UpdateSince(time.Now())
 	metrics.GetOrRegisterCounter(fmt.Sprintf("peer.sendpriority.%d", priority), nil).Inc(1)
 	wmsg := WrappedPriorityMsg{
-		Context: ctx,
-		Msg:     msg,
+		// Context: ctx,
+		Msg: msg,
 	}
 	err := p.pq.Push(wmsg, int(priority))
 	if err == pq.ErrContention {
@@ -177,9 +177,9 @@ func (p *Peer) SendPriority(ctx context.Context, msg interface{}, priority uint8
 
 // SendOfferedHashes sends OfferedHashesMsg protocol msg
 func (p *Peer) SendOfferedHashes(s *server, f, t uint64) error {
-	var sp opentracing.Span
-	ctx, sp := spancontext.StartSpan(
-		context.TODO(),
+	// var sp opentracing.Span
+	_, sp := spancontext.StartSpan(
+		// context.TODO(),
 		"send.offered.hashes")
 	defer sp.Finish()
 
@@ -205,7 +205,7 @@ func (p *Peer) SendOfferedHashes(s *server, f, t uint64) error {
 		Stream:        s.stream,
 	}
 	log.Trace("Swarm syncer offer batch", "peer", p.ID(), "stream", s.stream, "len", len(hashes), "from", from, "to", to)
-	return p.SendPriority(ctx, msg, s.priority)
+	return p.SendPriority(msg, s.priority)
 }
 
 func (p *Peer) getServer(s Stream) (*server, error) {

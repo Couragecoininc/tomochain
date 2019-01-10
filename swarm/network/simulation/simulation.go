@@ -99,7 +99,8 @@ func New(services map[string]ServiceFunc) (s *Simulation) {
 	}
 
 	s.Net = simulations.NewNetwork(
-		adapters.NewTCPAdapter(adapterServices),
+		// adapters.NewTCPAdapter(adapterServices),
+		adapters.NewSimAdapter(adapterServices),
 		&simulations.NetworkConfig{ID: "0"},
 	)
 

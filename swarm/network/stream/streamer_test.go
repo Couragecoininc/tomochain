@@ -20,11 +20,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	p2ptest "github.com/ethereum/go-ethereum/p2p/testing"
 )
 
@@ -36,7 +38,7 @@ func TestStreamerSubscribe(t *testing.T) {
 	}
 
 	stream := NewStream("foo", "", true)
-	err = streamer.Subscribe(tester.Nodes[0].ID(), stream, NewRange(0, 0), Top)
+	err = streamer.Subscribe(tester.IDs[0], stream, NewRange(0, 0), Top)
 	if err == nil || err.Error() != "stream foo not registered" {
 		t.Fatalf("Expected error %v, got %v", "stream foo not registered", err)
 	}
@@ -50,7 +52,7 @@ func TestStreamerRequestSubscription(t *testing.T) {
 	}
 
 	stream := NewStream("foo", "", false)
-	err = streamer.RequestSubscription(tester.Nodes[0].ID(), stream, &Range{}, Top)
+	err = streamer.RequestSubscription(tester.IDs[0], stream, &Range{}, Top)
 	if err == nil || err.Error() != "stream foo not registered" {
 		t.Fatalf("Expected error %v, got %v", "stream foo not registered", err)
 	}
@@ -144,10 +146,11 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 		return newTestClient(t), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	stream := NewStream("foo", "", true)
-	err = streamer.Subscribe(node.ID(), stream, NewRange(5, 8), Top)
+	err = streamer.Subscribe(node.ID, stream, NewRange(5, 8), Top)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -163,7 +166,7 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 						History:  NewRange(5, 8),
 						Priority: Top,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		},
@@ -182,7 +185,7 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 						To:     8,
 						Stream: stream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -194,7 +197,7 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 						From:   9,
 						To:     0,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		},
@@ -203,7 +206,7 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = streamer.Unsubscribe(node.ID(), stream)
+	err = streamer.Unsubscribe(node.ID, stream)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -216,7 +219,7 @@ func TestStreamerDownstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 				Msg: &UnsubscribeMsg{
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -239,7 +242,8 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 		return newTestServer(t, 10), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	err = tester.TestExchanges(p2ptest.Exchange{
 		Label: "Subscribe message",
@@ -251,7 +255,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -266,7 +270,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 					From:   6,
 					To:     9,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -283,7 +287,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchange(t *testing.T) {
 				Msg: &UnsubscribeMsg{
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -306,7 +310,8 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchangeLive(t *testing.T) {
 		return newTestServer(t, 0), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	err = tester.TestExchanges(p2ptest.Exchange{
 		Label: "Subscribe message",
@@ -317,7 +322,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchangeLive(t *testing.T) {
 					Stream:   stream,
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -332,7 +337,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchangeLive(t *testing.T) {
 					From:   1,
 					To:     0,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -349,7 +354,7 @@ func TestStreamerUpstreamSubscribeUnsubscribeMsgExchangeLive(t *testing.T) {
 				Msg: &UnsubscribeMsg{
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -372,7 +377,8 @@ func TestStreamerUpstreamSubscribeErrorMsgExchange(t *testing.T) {
 
 	stream := NewStream("bar", "", true)
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	err = tester.TestExchanges(p2ptest.Exchange{
 		Label: "Subscribe message",
@@ -384,7 +390,7 @@ func TestStreamerUpstreamSubscribeErrorMsgExchange(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -393,7 +399,7 @@ func TestStreamerUpstreamSubscribeErrorMsgExchange(t *testing.T) {
 				Msg: &SubscribeErrorMsg{
 					Error: "stream bar not registered",
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -416,7 +422,8 @@ func TestStreamerUpstreamSubscribeLiveAndHistory(t *testing.T) {
 		return newTestServer(t, 10), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	err = tester.TestExchanges(p2ptest.Exchange{
 		Label: "Subscribe message",
@@ -428,7 +435,7 @@ func TestStreamerUpstreamSubscribeLiveAndHistory(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -443,7 +450,7 @@ func TestStreamerUpstreamSubscribeLiveAndHistory(t *testing.T) {
 					From:   6,
 					To:     9,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 			{
 				Code: 1,
@@ -456,7 +463,7 @@ func TestStreamerUpstreamSubscribeLiveAndHistory(t *testing.T) {
 					To:     0,
 					Hashes: make([]byte, HashSize),
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -482,9 +489,10 @@ func TestStreamerDownstreamCorruptHashesMsgExchange(t *testing.T) {
 		return tc, nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
-	err = streamer.Subscribe(node.ID(), stream, NewRange(5, 8), Top)
+	err = streamer.Subscribe(node.ID, stream, NewRange(5, 8), Top)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -499,7 +507,7 @@ func TestStreamerDownstreamCorruptHashesMsgExchange(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	},
@@ -517,7 +525,7 @@ func TestStreamerDownstreamCorruptHashesMsgExchange(t *testing.T) {
 						To:     8,
 						Stream: stream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -526,7 +534,7 @@ func TestStreamerDownstreamCorruptHashesMsgExchange(t *testing.T) {
 	}
 
 	expectedError := errors.New("Message handler error: (msg code 1): error invalid hashes length (len: 40)")
-	if err := tester.TestDisconnected(&p2ptest.Disconnect{Peer: node.ID(), Error: expectedError}); err != nil {
+	if err := tester.TestDisconnected(&p2ptest.Disconnect{Peer: node.ID, Error: expectedError}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -547,9 +555,10 @@ func TestStreamerDownstreamOfferedHashesMsgExchange(t *testing.T) {
 		return tc, nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
-	err = streamer.Subscribe(node.ID(), stream, NewRange(5, 8), Top)
+	err = streamer.Subscribe(node.ID, stream, NewRange(5, 8), Top)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -564,7 +573,7 @@ func TestStreamerDownstreamOfferedHashesMsgExchange(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	},
@@ -582,7 +591,7 @@ func TestStreamerDownstreamOfferedHashesMsgExchange(t *testing.T) {
 						To:     8,
 						Stream: stream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -594,7 +603,7 @@ func TestStreamerDownstreamOfferedHashesMsgExchange(t *testing.T) {
 						From:   9,
 						To:     0,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -641,10 +650,11 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 		return newTestServer(t, 10), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	stream := NewStream("foo", "", true)
-	err = streamer.RequestSubscription(node.ID(), stream, NewRange(5, 8), Top)
+	err = streamer.RequestSubscription(node.ID, stream, NewRange(5, 8), Top)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -660,7 +670,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 						History:  NewRange(5, 8),
 						Priority: Top,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		},
@@ -674,7 +684,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 						History:  NewRange(5, 8),
 						Priority: Top,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -689,7 +699,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 						From:   6,
 						To:     9,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 				{
 					Code: 1,
@@ -702,7 +712,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 						To:     0,
 						Hashes: make([]byte, HashSize),
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		},
@@ -711,7 +721,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = streamer.Quit(node.ID(), stream)
+	err = streamer.Quit(node.ID, stream)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -724,7 +734,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 				Msg: &QuitMsg{
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -735,7 +745,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 
 	historyStream := getHistoryStream(stream)
 
-	err = streamer.Quit(node.ID(), historyStream)
+	err = streamer.Quit(node.ID, historyStream)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -748,7 +758,7 @@ func TestStreamerRequestSubscriptionQuitMsgExchange(t *testing.T) {
 				Msg: &QuitMsg{
 					Stream: historyStream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -778,7 +788,8 @@ func TestMaxPeerServersWithUnsubscribe(t *testing.T) {
 		return newTestServer(t, 0), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	for i := 0; i < maxPeerServers+10; i++ {
 		stream := NewStream("foo", strconv.Itoa(i), true)
@@ -792,7 +803,7 @@ func TestMaxPeerServersWithUnsubscribe(t *testing.T) {
 						Stream:   stream,
 						Priority: Top,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -807,7 +818,7 @@ func TestMaxPeerServersWithUnsubscribe(t *testing.T) {
 						From:   1,
 						To:     0,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -824,7 +835,7 @@ func TestMaxPeerServersWithUnsubscribe(t *testing.T) {
 					Msg: &UnsubscribeMsg{
 						Stream: stream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -852,7 +863,8 @@ func TestMaxPeerServersWithoutUnsubscribe(t *testing.T) {
 		return newTestServer(t, 0), nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	for i := 0; i < maxPeerServers+10; i++ {
 		stream := NewStream("foo", strconv.Itoa(i), true)
@@ -867,7 +879,7 @@ func TestMaxPeerServersWithoutUnsubscribe(t *testing.T) {
 							Stream:   stream,
 							Priority: Top,
 						},
-						Peer: node.ID(),
+						Peer: node.ID,
 					},
 				},
 				Expects: []p2ptest.Expect{
@@ -876,7 +888,7 @@ func TestMaxPeerServersWithoutUnsubscribe(t *testing.T) {
 						Msg: &SubscribeErrorMsg{
 							Error: ErrMaxPeerServers.Error(),
 						},
-						Peer: node.ID(),
+						Peer: node.ID,
 					},
 				},
 			})
@@ -896,7 +908,7 @@ func TestMaxPeerServersWithoutUnsubscribe(t *testing.T) {
 						Stream:   stream,
 						Priority: Top,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -911,7 +923,7 @@ func TestMaxPeerServersWithoutUnsubscribe(t *testing.T) {
 						From:   1,
 						To:     0,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})

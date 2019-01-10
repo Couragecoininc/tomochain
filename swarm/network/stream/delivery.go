@@ -22,9 +22,9 @@ import (
 
 	"fmt"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
 	"github.com/ethereum/go-ethereum/swarm/storage"
@@ -143,7 +143,7 @@ func (d *Delivery) handleRetrieveRequestMsg(ctx context.Context, sp *Peer, req *
 
 	var osp opentracing.Span
 	ctx, osp = spancontext.StartSpan(
-		ctx,
+		// ctx,
 		"retrieve.request")
 	defer osp.Finish()
 
@@ -212,7 +212,7 @@ type ChunkDeliveryMsgSyncing ChunkDeliveryMsg
 func (d *Delivery) handleChunkDeliveryMsg(ctx context.Context, sp *Peer, req *ChunkDeliveryMsg) error {
 	var osp opentracing.Span
 	ctx, osp = spancontext.StartSpan(
-		ctx,
+		// ctx,
 		"chunk.delivery")
 	defer osp.Finish()
 
@@ -268,7 +268,7 @@ func (d *Delivery) RequestFromPeers(ctx context.Context, req *network.Request) (
 		}
 	}
 
-	err := sp.SendPriority(ctx, &RetrieveRequestMsg{
+	err := sp.SendPriority(&RetrieveRequestMsg{
 		Addr:      req.Addr,
 		SkipCheck: req.SkipCheck,
 		HopCount:  req.HopCount,

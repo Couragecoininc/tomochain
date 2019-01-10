@@ -18,6 +18,7 @@ package stream
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"runtime"
 	"sync"
@@ -147,9 +148,10 @@ var simServiceMap = map[string]simulation.ServiceFunc{
 }
 
 func streamerFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-	n := ctx.Config.Node()
+	// n := ctx.Config.Node()
+	n := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 	addr := network.NewAddr(n)
-	store, datadir, err := createTestLocalStorageForID(n.ID(), addr)
+	store, datadir, err := createTestLocalStorageForID(n.ID, addr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,7 +169,7 @@ func streamerFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Servic
 		Retrieval:       RetrievalDisabled,
 		Syncing:         SyncingAutoSubscribe,
 		SyncUpdateDelay: 3 * time.Second,
-	}, nil)
+	})
 
 	bucket.Store(bucketKeyRegistry, r)
 
@@ -246,7 +248,8 @@ func runSim(conf *synctestConfig, ctx context.Context, sim *simulation.Simulatio
 
 		//get the node at that index
 		//this is the node selected for upload
-		node := sim.Net.GetRandomUpNode()
+		// node := sim.Net.GetRandomUpNode()
+		node := sim.GetRandomUpNode()
 		item, ok := sim.NodeItem(node.ID(), bucketKeyStore)
 		if !ok {
 			return fmt.Errorf("No localstore")
@@ -332,9 +335,10 @@ func testSyncingViaDirectSubscribe(t *testing.T, chunkCount int, nodeCount int) 
 
 	sim := simulation.New(map[string]simulation.ServiceFunc{
 		"streamer": func(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-			n := ctx.Config.Node()
+			// n := ctx.Config.Node()
+			n := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(n)
-			store, datadir, err := createTestLocalStorageForID(n.ID(), addr)
+			store, datadir, err := createTestLocalStorageForID(n.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -351,7 +355,7 @@ func testSyncingViaDirectSubscribe(t *testing.T, chunkCount int, nodeCount int) 
 			r := NewRegistry(addr.ID(), delivery, netStore, state.NewInmemoryStore(), &RegistryOptions{
 				Retrieval: RetrievalDisabled,
 				Syncing:   SyncingRegisterOnly,
-			}, nil)
+			})
 			bucket.Store(bucketKeyRegistry, r)
 
 			fileStore := storage.NewFileStore(netStore, storage.NewFileStoreParams())
@@ -450,7 +454,7 @@ func testSyncingViaDirectSubscribe(t *testing.T, chunkCount int, nodeCount int) 
 			}
 		}
 		//select a random node for upload
-		node := sim.Net.GetRandomUpNode()
+		node := sim.GetRandomUpNode()
 		item, ok := sim.NodeItem(node.ID(), bucketKeyStore)
 		if !ok {
 			return fmt.Errorf("No localstore")

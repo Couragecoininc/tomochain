@@ -19,13 +19,12 @@
 package pss
 
 import (
-	"context"
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Generic ping protocol implementation for
@@ -41,7 +40,7 @@ type Ping struct {
 	InC  chan bool // optional, report back to calling code
 }
 
-func (p *Ping) pingHandler(ctx context.Context, msg interface{}) error {
+func (p *Ping) pingHandler(msg interface{}) error {
 	var pingmsg *PingMsg
 	var ok bool
 	if pingmsg, ok = msg.(*PingMsg); !ok {
@@ -81,7 +80,7 @@ func NewPingProtocol(ping *Ping) *p2p.Protocol {
 				for {
 					select {
 					case ispong := <-ping.OutC:
-						pp.Send(context.TODO(), &PingMsg{
+						pp.Send(&PingMsg{
 							Created: time.Now(),
 							Pong:    ispong,
 						})

@@ -16,8 +16,10 @@
 package stream
 
 import (
+	"net"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	p2ptest "github.com/ethereum/go-ethereum/p2p/testing"
 )
 
@@ -34,7 +36,8 @@ func TestLigthnodeRetrieveRequestWithRetrieve(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	stream := NewStream(swarmChunkServerStreamName, "", false)
 
@@ -46,7 +49,7 @@ func TestLigthnodeRetrieveRequestWithRetrieve(t *testing.T) {
 				Msg: &SubscribeMsg{
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -54,7 +57,7 @@ func TestLigthnodeRetrieveRequestWithRetrieve(t *testing.T) {
 		t.Fatalf("Got %v", err)
 	}
 
-	err = tester.TestDisconnected(&p2ptest.Disconnect{Peer: node.ID()})
+	err = tester.TestDisconnected(&p2ptest.Disconnect{Peer: node.ID})
 	if err == nil || err.Error() != "timed out waiting for peers to disconnect" {
 		t.Fatalf("Expected no disconnect, got %v", err)
 	}
@@ -73,7 +76,8 @@ func TestLigthnodeRetrieveRequestWithoutRetrieve(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	stream := NewStream(swarmChunkServerStreamName, "", false)
 
@@ -86,7 +90,7 @@ func TestLigthnodeRetrieveRequestWithoutRetrieve(t *testing.T) {
 					Msg: &SubscribeMsg{
 						Stream: stream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -95,7 +99,7 @@ func TestLigthnodeRetrieveRequestWithoutRetrieve(t *testing.T) {
 					Msg: &SubscribeErrorMsg{
 						Error: "stream RETRIEVE_REQUEST not registered",
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -117,7 +121,8 @@ func TestLigthnodeRequestSubscriptionWithSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	syncStream := NewStream("SYNC", FormatSyncBinKey(1), false)
 
@@ -130,7 +135,7 @@ func TestLigthnodeRequestSubscriptionWithSync(t *testing.T) {
 					Msg: &RequestSubscriptionMsg{
 						Stream: syncStream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 			Expects: []p2ptest.Expect{
@@ -139,7 +144,7 @@ func TestLigthnodeRequestSubscriptionWithSync(t *testing.T) {
 					Msg: &SubscribeMsg{
 						Stream: syncStream,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -162,7 +167,8 @@ func TestLigthnodeRequestSubscriptionWithoutSync(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	syncStream := NewStream("SYNC", FormatSyncBinKey(1), false)
 
@@ -174,7 +180,7 @@ func TestLigthnodeRequestSubscriptionWithoutSync(t *testing.T) {
 				Msg: &RequestSubscriptionMsg{
 					Stream: syncStream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -183,7 +189,7 @@ func TestLigthnodeRequestSubscriptionWithoutSync(t *testing.T) {
 				Msg: &SubscribeErrorMsg{
 					Error: "stream SYNC not registered",
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	}, p2ptest.Exchange{
@@ -194,7 +200,7 @@ func TestLigthnodeRequestSubscriptionWithoutSync(t *testing.T) {
 				Msg: &SubscribeMsg{
 					Stream: syncStream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -203,7 +209,7 @@ func TestLigthnodeRequestSubscriptionWithoutSync(t *testing.T) {
 				Msg: &SubscribeErrorMsg{
 					Error: "stream SYNC not registered",
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})

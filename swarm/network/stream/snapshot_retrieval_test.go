@@ -18,15 +18,16 @@ package stream
 import (
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/network/simulation"
 	"github.com/ethereum/go-ethereum/swarm/state"
@@ -109,9 +110,10 @@ var retrievalSimServiceMap = map[string]simulation.ServiceFunc{
 }
 
 func retrievalStreamerFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-	n := ctx.Config.Node()
+	// n := ctx.Config.Node()
+	n := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 	addr := network.NewAddr(n)
-	store, datadir, err := createTestLocalStorageForID(n.ID(), addr)
+	store, datadir, err := createTestLocalStorageForID(n.ID, addr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -130,7 +132,7 @@ func retrievalStreamerFunc(ctx *adapters.ServiceContext, bucket *sync.Map) (s no
 		Retrieval:       RetrievalEnabled,
 		Syncing:         SyncingAutoSubscribe,
 		SyncUpdateDelay: 3 * time.Second,
-	}, nil)
+	})
 
 	fileStore := storage.NewFileStore(netStore, storage.NewFileStoreParams())
 	bucket.Store(bucketKeyFileStore, fileStore)
@@ -277,7 +279,7 @@ func runRetrievalTest(chunkCount int, nodeCount int) error {
 		}
 
 		//this is the node selected for upload
-		node := sim.Net.GetRandomUpNode()
+		node := sim.GetRandomUpNode()
 		item, ok := sim.NodeItem(node.ID(), bucketKeyStore)
 		if !ok {
 			return fmt.Errorf("No localstore")

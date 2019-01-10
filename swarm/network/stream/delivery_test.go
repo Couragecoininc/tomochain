@@ -20,18 +20,20 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
 	p2ptest "github.com/ethereum/go-ethereum/p2p/testing"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	pq "github.com/ethereum/go-ethereum/swarm/network/priorityqueue"
 	"github.com/ethereum/go-ethereum/swarm/network/simulation"
@@ -52,7 +54,8 @@ func TestStreamerRetrieveRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	ctx := context.Background()
 	req := network.NewRequest(
@@ -74,7 +77,7 @@ func TestStreamerRetrieveRequest(t *testing.T) {
 					History:  nil,
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 			{ //expect a retrieve request message for the given hash
 				Code: 5,
@@ -82,7 +85,7 @@ func TestStreamerRetrieveRequest(t *testing.T) {
 					Addr:      hash0[:],
 					SkipCheck: true,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -104,15 +107,16 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	chunk := storage.NewChunk(storage.Address(hash0[:]), nil)
 
-	peer := streamer.getPeer(node.ID())
+	peer := streamer.getPeer(node.ID)
 
 	stream := NewStream(swarmChunkServerStreamName, "", true)
 	//simulate pre-subscription to RETRIEVE_REQUEST stream on peer
-	peer.handleSubscribeMsg(context.TODO(), &SubscribeMsg{
+	peer.handleSubscribeMsg(&SubscribeMsg{
 		Stream:   stream,
 		History:  nil,
 		Priority: Top,
@@ -128,7 +132,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 					History:  nil,
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	}, p2ptest.Exchange{
@@ -139,7 +143,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 				Msg: &RetrieveRequestMsg{
 					Addr: chunk.Address()[:],
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -151,7 +155,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchangeWithoutStore(t *testing.T) {
 					From:          0,
 					To:            0,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -176,13 +180,14 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
-	peer := streamer.getPeer(node.ID())
+	peer := streamer.getPeer(node.ID)
 
 	stream := NewStream(swarmChunkServerStreamName, "", true)
 
-	peer.handleSubscribeMsg(context.TODO(), &SubscribeMsg{
+	peer.handleSubscribeMsg(&SubscribeMsg{
 		Stream:   stream,
 		History:  nil,
 		Priority: Top,
@@ -204,7 +209,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 					History:  nil,
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	}, p2ptest.Exchange{
@@ -215,7 +220,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 				Msg: &RetrieveRequestMsg{
 					Addr: hash,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -231,7 +236,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 					To:     32,
 					Stream: stream,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -256,7 +261,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 					Addr:      hash,
 					SkipCheck: true,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 		Expects: []p2ptest.Expect{
@@ -266,7 +271,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 					Addr:  hash,
 					SData: hash,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})
@@ -278,7 +283,7 @@ func TestStreamerUpstreamRetrieveRequestMsgExchange(t *testing.T) {
 
 // if there is one peer in the Kademlia, RequestFromPeers should return it
 func TestRequestFromPeers(t *testing.T) {
-	dummyPeerID := enode.HexID("3431c3939e1ee2a6345e976a8234f9870152d64879f30bc272a074f6859e75e8")
+	dummyPeerID := discover.MustHexID(strings.Repeat("3431c3939e1ee2a6345e976a8234f9870152d64879f30bc272a074f6859e75e8", 2))
 
 	addr := network.RandomAddr()
 	to := network.NewKademlia(addr.OAddr, network.NewKadParams())
@@ -290,7 +295,7 @@ func TestRequestFromPeers(t *testing.T) {
 		Peer:      protocolsPeer,
 	}, to)
 	to.On(peer)
-	r := NewRegistry(addr.ID(), delivery, nil, nil, nil, nil)
+	r := NewRegistry(addr.ID(), delivery, nil, nil, nil)
 
 	// an empty priorityQueue has to be created to prevent a goroutine being called after the test has finished
 	sp := &Peer{
@@ -317,7 +322,7 @@ func TestRequestFromPeers(t *testing.T) {
 
 // RequestFromPeers should not return light nodes
 func TestRequestFromPeersWithLightNode(t *testing.T) {
-	dummyPeerID := enode.HexID("3431c3939e1ee2a6345e976a8234f9870152d64879f30bc272a074f6859e75e8")
+	dummyPeerID := discover.MustHexID(strings.Repeat("3431c3939e1ee2a6345e976a8234f9870152d64879f30bc272a074f6859e75e8", 2))
 
 	addr := network.RandomAddr()
 	to := network.NewKademlia(addr.OAddr, network.NewKadParams())
@@ -331,7 +336,7 @@ func TestRequestFromPeersWithLightNode(t *testing.T) {
 		Peer:      protocolsPeer,
 	}, to)
 	to.On(peer)
-	r := NewRegistry(addr.ID(), delivery, nil, nil, nil, nil)
+	r := NewRegistry(addr.ID(), delivery, nil, nil, nil)
 	// an empty priorityQueue has to be created to prevent a goroutine being called after the test has finished
 	sp := &Peer{
 		Peer:     protocolsPeer,
@@ -372,11 +377,12 @@ func TestStreamerDownstreamChunkDeliveryMsgExchange(t *testing.T) {
 		}, nil
 	})
 
-	node := tester.Nodes[0]
+	nid := tester.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 
 	//subscribe to custom stream
 	stream := NewStream("foo", "", true)
-	err = streamer.Subscribe(node.ID(), stream, NewRange(5, 8), Top)
+	err = streamer.Subscribe(node.ID, stream, NewRange(5, 8), Top)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -394,7 +400,7 @@ func TestStreamerDownstreamChunkDeliveryMsgExchange(t *testing.T) {
 					History:  NewRange(5, 8),
 					Priority: Top,
 				},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	},
@@ -408,7 +414,7 @@ func TestStreamerDownstreamChunkDeliveryMsgExchange(t *testing.T) {
 						Addr:  chunkKey,
 						SData: chunkData,
 					},
-					Peer: node.ID(),
+					Peer: node.ID,
 				},
 			},
 		})
@@ -455,9 +461,10 @@ func TestDeliveryFromNodes(t *testing.T) {
 func testDeliveryFromNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck bool) {
 	sim := simulation.New(map[string]simulation.ServiceFunc{
 		"streamer": func(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-			node := ctx.Config.Node()
+			// node := ctx.Config.Node()
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
-			store, datadir, err := createTestLocalStorageForID(node.ID(), addr)
+			store, datadir, err := createTestLocalStorageForID(node.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -480,7 +487,7 @@ func testDeliveryFromNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck
 				SkipCheck: skipCheck,
 				Syncing:   SyncingDisabled,
 				Retrieval: RetrievalEnabled,
-			}, nil)
+			})
 			bucket.Store(bucketKeyRegistry, r)
 
 			fileStore := storage.NewFileStore(netStore, storage.NewFileStoreParams())
@@ -632,9 +639,10 @@ func BenchmarkDeliveryFromNodesWithCheck(b *testing.B) {
 func benchmarkDeliveryFromNodes(b *testing.B, nodes, conns, chunkCount int, skipCheck bool) {
 	sim := simulation.New(map[string]simulation.ServiceFunc{
 		"streamer": func(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-			node := ctx.Config.Node()
+			// node := ctx.Config.Node()
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
-			store, datadir, err := createTestLocalStorageForID(node.ID(), addr)
+			store, datadir, err := createTestLocalStorageForID(node.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -657,7 +665,7 @@ func benchmarkDeliveryFromNodes(b *testing.B, nodes, conns, chunkCount int, skip
 				Syncing:         SyncingDisabled,
 				Retrieval:       RetrievalDisabled,
 				SyncUpdateDelay: 0,
-			}, nil)
+			})
 
 			fileStore := storage.NewFileStore(netStore, storage.NewFileStoreParams())
 			bucket.Store(bucketKeyFileStore, fileStore)

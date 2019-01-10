@@ -127,10 +127,19 @@ func (s *Simulation) AddNodesAndConnectFull(count int, opts ...AddNodeOption) (i
 	if err != nil {
 		return nil, err
 	}
-	err = s.Net.ConnectNodesFull(ids)
-	if err != nil {
-		return nil, err
+	for i, lid := range ids {
+		for _, rid := range ids[i+1:] {
+			if err = s.Net.Connect(lid, rid); err != nil {
+				return nil, err
+			}
+		}
 	}
+
+	// err = s.Net.ConnectNodesFull(ids)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	return ids, nil
 }
 
@@ -145,7 +154,10 @@ func (s *Simulation) AddNodesAndConnectChain(count int, opts ...AddNodeOption) (
 	if err != nil {
 		return nil, err
 	}
-	err = s.Net.ConnectToLastNode(id)
+	ids = s.getNodeIDs()
+	last := ids[len(ids)-1]
+	err = s.Net.Connect(last, id)
+	// err = s.Net.ConnectToLastNode(id)
 	if err != nil {
 		return nil, err
 	}
@@ -154,10 +166,18 @@ func (s *Simulation) AddNodesAndConnectChain(count int, opts ...AddNodeOption) (
 		return nil, err
 	}
 	ids = append([]discover.NodeID{id}, ids...)
-	err = s.Net.ConnectNodesChain(ids)
-	if err != nil {
-		return nil, err
+
+	// loop chain
+	l := len(ids)
+	for i := 0; i < l-1; i++ {
+		if err := s.Net.Connect(ids[i], ids[i+1]); err != nil {
+			return nil, err
+		}
 	}
+	// err = s.Net.ConnectNodesChain(ids)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return ids, nil
 }
 
@@ -171,10 +191,20 @@ func (s *Simulation) AddNodesAndConnectRing(count int, opts ...AddNodeOption) (i
 	if err != nil {
 		return nil, err
 	}
-	err = s.Net.ConnectNodesRing(ids)
-	if err != nil {
-		return nil, err
+
+	// loop chain
+	l := len(ids)
+	for i := 0; i < l-1; i++ {
+		if err := s.Net.Connect(ids[i], ids[i+1]); err != nil {
+			return nil, err
+		}
 	}
+	err = s.Net.Connect(ids[l-1], ids[0])
+
+	// err = s.Net.ConnectNodesRing(ids)
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return ids, nil
 }
 
@@ -188,10 +218,22 @@ func (s *Simulation) AddNodesAndConnectStar(count int, opts ...AddNodeOption) (i
 	if err != nil {
 		return nil, err
 	}
-	err = s.Net.ConnectNodesStar(ids[0], ids[1:])
-	if err != nil {
-		return nil, err
+
+	pivot := ids[0]
+	starts := ids[1:]
+	for _, id := range starts {
+		if pivot == id {
+			continue
+		}
+		if err := s.Net.Connect(pivot, id); err != nil {
+			return nil, err
+		}
 	}
+
+	// err = s.Net.ConnectNodesStar(ids[0], ids[1:])
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return ids, nil
 }
 
@@ -265,9 +307,70 @@ func (s *Simulation) StartNode(id discover.NodeID) (err error) {
 	return s.Net.Start(id)
 }
 
+func (s *Simulation) getNodeIDs() (ids []discover.NodeID) {
+	for _, node := range s.Net.GetNodes() {
+		ids = append(ids, node.ID())
+	}
+	return ids
+}
+
+func (s *Simulation) getUpNodeIDs() (ids []discover.NodeID) {
+	for _, node := range s.Net.GetNodes() {
+		if node.Up {
+			ids = append(ids, node.ID())
+		}
+	}
+	return ids
+}
+
+func (s *Simulation) getDownNodeIDs() (ids []discover.NodeID) {
+	for _, node := range s.Net.GetNodes() {
+		if !node.Up {
+			ids = append(ids, node.ID())
+		}
+	}
+	return ids
+}
+
+func filterIDs(ids []discover.NodeID, excludeIDs []discover.NodeID) []discover.NodeID {
+	exclude := make(map[discover.NodeID]bool)
+	if excludeIDs != nil {
+		for _, id := range excludeIDs {
+			exclude[id] = true
+		}
+	}
+	var filtered []discover.NodeID
+	for _, id := range ids {
+		if _, found := exclude[id]; !found {
+			filtered = append(filtered, id)
+		}
+	}
+	return filtered
+}
+
+func (s *Simulation) GetRandomUpNode() *simulations.Node {
+	return s.getRandomNode(s.getUpNodeIDs(), nil)
+}
+
+func (s *Simulation) GetRandomDownNode() *simulations.Node {
+	return s.getRandomNode(s.getDownNodeIDs(), nil)
+}
+
+func (s *Simulation) getRandomNode(ids []discover.NodeID, excludeIDs []discover.NodeID) *simulations.Node {
+	filtered := filterIDs(ids, excludeIDs)
+
+	l := len(filtered)
+	if l == 0 {
+		return nil
+	}
+	return s.Net.GetNode(filtered[rand.Intn(l)])
+}
+
 // StartRandomNode starts a random node.
 func (s *Simulation) StartRandomNode() (id discover.NodeID, err error) {
-	n := s.Net.GetRandomDownNode()
+
+	// n := s.Net.GetRandomDownNode()
+	n := s.getRandomNode(s.getDownNodeIDs(), nil)
 	if n == nil {
 		return id, ErrNodeNotFound
 	}
@@ -278,7 +381,8 @@ func (s *Simulation) StartRandomNode() (id discover.NodeID, err error) {
 func (s *Simulation) StartRandomNodes(count int) (ids []discover.NodeID, err error) {
 	ids = make([]discover.NodeID, 0, count)
 	for i := 0; i < count; i++ {
-		n := s.Net.GetRandomDownNode()
+		// n := s.Net.GetRandomDownNode()
+		n := s.getRandomNode(s.getDownNodeIDs(), nil)
 		if n == nil {
 			return nil, ErrNodeNotFound
 		}
@@ -298,7 +402,8 @@ func (s *Simulation) StopNode(id discover.NodeID) (err error) {
 
 // StopRandomNode stops a random node.
 func (s *Simulation) StopRandomNode() (id discover.NodeID, err error) {
-	n := s.Net.GetRandomUpNode()
+	// n := s.Net.GetRandomUpNode()
+	n := s.getRandomNode(s.getUpNodeIDs(), nil)
 	if n == nil {
 		return id, ErrNodeNotFound
 	}
@@ -309,7 +414,8 @@ func (s *Simulation) StopRandomNode() (id discover.NodeID, err error) {
 func (s *Simulation) StopRandomNodes(count int) (ids []discover.NodeID, err error) {
 	ids = make([]discover.NodeID, 0, count)
 	for i := 0; i < count; i++ {
-		n := s.Net.GetRandomUpNode()
+		// n := s.Net.GetRandomUpNode()
+		n := s.getRandomNode(s.getUpNodeIDs(), nil)
 		if n == nil {
 			return nil, ErrNodeNotFound
 		}

@@ -24,9 +24,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	ch "github.com/ethereum/go-ethereum/swarm/chunk"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
 	opentracing "github.com/opentracing/opentracing-go"
 	olog "github.com/opentracing/opentracing-go/log"
@@ -396,7 +396,7 @@ func (r *LazyChunkReader) Size(ctx context.Context, quitC chan bool) (n int64, e
 	var sp opentracing.Span
 	var cctx context.Context
 	cctx, sp = spancontext.StartSpan(
-		ctx,
+		// ctx,
 		"lcr.size")
 	defer sp.Finish()
 
@@ -427,7 +427,7 @@ func (r *LazyChunkReader) ReadAt(b []byte, off int64) (read int, err error) {
 	var sp opentracing.Span
 	var cctx context.Context
 	cctx, sp = spancontext.StartSpan(
-		r.ctx,
+		// r.ctx,
 		"lcr.read")
 	defer sp.Finish()
 

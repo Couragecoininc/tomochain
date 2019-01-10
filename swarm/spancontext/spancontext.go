@@ -19,9 +19,9 @@ func FromContext(ctx context.Context) opentracing.SpanContext {
 	return nil
 }
 
-func StartSpan(ctx context.Context, name string) (context.Context, opentracing.Span) {
+func StartSpan(name string) (context.Context, opentracing.Span) {
 	tracer := opentracing.GlobalTracer()
-
+	ctx := context.TODO()
 	sctx := FromContext(ctx)
 
 	var sp opentracing.Span

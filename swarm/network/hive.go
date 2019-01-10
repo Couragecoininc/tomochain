@@ -22,10 +22,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/state"
 )
 
@@ -57,10 +56,10 @@ func NewHiveParams() *HiveParams {
 
 // Hive manages network connections of the swarm node
 type Hive struct {
-	*HiveParams                   // settings
-	*Kademlia                     // the overlay connectiviy driver
-	Store       state.Store       // storage interface to save peers across sessions
-	addPeer     func(*enode.Node) // server callback to connect to a peer
+	*HiveParams                      // settings
+	*Kademlia                        // the overlay connectiviy driver
+	Store       state.Store          // storage interface to save peers across sessions
+	addPeer     func(*discover.Node) // server callback to connect to a peer
 	// bookkeeping
 	lock   sync.Mutex
 	peers  map[discover.NodeID]*BzzPeer
@@ -140,7 +139,8 @@ func (h *Hive) connect() {
 		}
 
 		log.Trace(fmt.Sprintf("%08x hive connect() suggested %08x", h.BaseAddr()[:4], addr.Address()[:4]))
-		under, err := enode.ParseV4(string(addr.Under()))
+		// under, err := enode.ParseV4(string(addr.Under()))
+		under, err := discover.ParseNode(string(addr.Under()))
 		if err != nil {
 			log.Warn(fmt.Sprintf("%08x unable to connect to bee %08x: invalid node URL: %v", h.BaseAddr()[:4], addr.Address()[:4], err))
 			continue
@@ -200,7 +200,13 @@ func (h *Hive) PeerInfo(id discover.NodeID) interface{} {
 	if p == nil {
 		return nil
 	}
-	addr := NewAddr(p.Node())
+
+	addr := NewAddrFromBytes(p.OAddr, p.UAddr)
+
+	// node := discover.NewNode(p.ID(), p.Peer, 30303, 30303)
+	// node := p.UAddr
+	// addr := NewAddr(p.Node())
+
 	return struct {
 		OAddr hexutil.Bytes
 		UAddr hexutil.Bytes

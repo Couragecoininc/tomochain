@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"path"
 	"strings"
@@ -325,7 +326,43 @@ func discoverySimulation(nodes, conns int, adapter adapters.NodeAdapter) (*simul
 					panic("stick to the rules, you know what they are")
 				}
 			}
-			snap, err = net.SnapshotWithServices(addServices, removeServices)
+			snap, err = net.Snapshot()
+
+			for _, node := range snap.Nodes {
+
+				for _, addSvc := range addServices {
+					haveSvc := false
+					for _, svc := range node.Node.Config.Services {
+						if svc == addSvc {
+							haveSvc = true
+							break
+						}
+					}
+					if !haveSvc {
+						node.Node.Config.Services = append(node.Node.Config.Services, addSvc)
+					}
+				}
+
+				var cleanedServices []string
+				for _, svc := range node.Node.Config.Services {
+					haveSvc := false
+					for _, rmSvc := range addServices {
+						if svc == rmSvc {
+							haveSvc = true
+							break
+						}
+						if !haveSvc {
+							cleanedServices = append(cleanedServices, svc)
+						}
+					}
+
+				}
+
+				node.Node.Config.Services = cleanedServices
+
+			}
+
+			// snap, err = net.SnapshotWithServices(addServices, removeServices)
 		} else {
 			snap, err = net.Snapshot()
 		}
@@ -563,7 +600,8 @@ func triggerChecks(trigger chan discover.NodeID, net *simulations.Network, id di
 }
 
 func newService(ctx *adapters.ServiceContext) (node.Service, error) {
-	addr := network.NewAddr(ctx.Config.Node())
+	node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
+	addr := network.NewAddr(node)
 
 	kp := network.NewKadParams()
 	kp.MinProxBinSize = testMinProxBinSize

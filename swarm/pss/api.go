@@ -23,9 +23,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 // Wrapper for receiving pss messages when using the pss API
@@ -124,11 +124,15 @@ func (pssapi *API) GetPublicKey() (keybytes hexutil.Bytes) {
 
 // Set Public key to associate with a particular Pss peer
 func (pssapi *API) SetPeerPublicKey(pubkey hexutil.Bytes, topic Topic, addr PssAddress) error {
-	pk, err := crypto.UnmarshalPubkey(pubkey)
-	if err != nil {
+	// pk, err := crypto.UnmarshalPubkey(pubkey)
+	// if err != nil {
+	// 	return fmt.Errorf("Cannot unmarshal pubkey: %x", pubkey)
+	// }
+	pk := crypto.ToECDSAPub(pubkey)
+	if pk == nil {
 		return fmt.Errorf("Cannot unmarshal pubkey: %x", pubkey)
 	}
-	err = pssapi.Pss.SetPeerPublicKey(pk, topic, addr)
+	err := pssapi.Pss.SetPeerPublicKey(pk, topic, addr)
 	if err != nil {
 		return fmt.Errorf("Invalid key: %x", pk)
 	}

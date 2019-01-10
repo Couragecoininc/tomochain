@@ -24,11 +24,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
@@ -36,7 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/simulations"
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/network/simulation"
 	"github.com/ethereum/go-ethereum/swarm/state"
@@ -113,7 +114,7 @@ func TestNonExistingHashesWithServer(t *testing.T) {
 
 	result := sim.Run(ctx, func(ctx context.Context, sim *simulation.Simulation) error {
 		//check on the node's FileStore (netstore)
-		id := sim.Net.GetRandomUpNode().ID()
+		id := sim.GetRandomUpNode().ID()
 		item, ok := sim.NodeItem(id, bucketKeyFileStore)
 		if !ok {
 			t.Fatalf("No filestore")
@@ -171,7 +172,8 @@ func TestSnapshotSyncWithServer(t *testing.T) {
 
 	sim := simulation.New(map[string]simulation.ServiceFunc{
 		"streamer": func(ctx *adapters.ServiceContext, bucket *sync.Map) (s node.Service, cleanup func(), err error) {
-			n := ctx.Config.Node()
+			// n := ctx.Config.Node()
+			n := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(n)
 			store, datadir, err := createTestLocalStorageForID(n.ID(), addr)
 			if err != nil {
@@ -191,7 +193,7 @@ func TestSnapshotSyncWithServer(t *testing.T) {
 				Retrieval:       RetrievalDisabled,
 				Syncing:         SyncingAutoSubscribe,
 				SyncUpdateDelay: 3 * time.Second,
-			}, nil)
+			})
 
 			tr := &testRegistry{
 				Registry: r,

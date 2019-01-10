@@ -21,12 +21,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	bv "github.com/ethereum/go-ethereum/swarm/network/bitvector"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
 	"github.com/ethereum/go-ethereum/swarm/storage"
-	"github.com/opentracing/opentracing-go"
 )
 
 var syncBatchTimeout = 30 * time.Second
@@ -74,21 +73,21 @@ type RequestSubscriptionMsg struct {
 	Priority uint8  // delivered on priority channel
 }
 
-func (p *Peer) handleRequestSubscription(ctx context.Context, req *RequestSubscriptionMsg) (err error) {
+func (p *Peer) handleRequestSubscription(req *RequestSubscriptionMsg) (err error) {
 	log.Debug(fmt.Sprintf("handleRequestSubscription: streamer %s to subscribe to %s with stream %s", p.streamer.addr, p.ID(), req.Stream))
 	if err = p.streamer.Subscribe(p.ID(), req.Stream, req.History, req.Priority); err != nil {
 		// The error will be sent as a subscribe error message
 		// and will not be returned as it will prevent any new message
 		// exchange between peers over p2p. Instead, error will be returned
 		// only if there is one from sending subscribe error message.
-		err = p.Send(ctx, SubscribeErrorMsg{
+		err = p.Send(SubscribeErrorMsg{
 			Error: err.Error(),
 		})
 	}
 	return err
 }
 
-func (p *Peer) handleSubscribeMsg(ctx context.Context, req *SubscribeMsg) (err error) {
+func (p *Peer) handleSubscribeMsg(req *SubscribeMsg) (err error) {
 	metrics.GetOrRegisterCounter("peer.handlesubscribemsg", nil).Inc(1)
 
 	defer func() {
@@ -97,7 +96,7 @@ func (p *Peer) handleSubscribeMsg(ctx context.Context, req *SubscribeMsg) (err e
 			// and will not be returned as it will prevent any new message
 			// exchange between peers over p2p. Instead, error will be returned
 			// only if there is one from sending subscribe error message.
-			err = p.Send(context.TODO(), SubscribeErrorMsg{
+			err = p.Send(SubscribeErrorMsg{
 				Error: err.Error(),
 			})
 		}
@@ -194,12 +193,12 @@ func (m OfferedHashesMsg) String() string {
 
 // handleOfferedHashesMsg protocol msg handler calls the incoming streamer interface
 // Filter method
-func (p *Peer) handleOfferedHashesMsg(ctx context.Context, req *OfferedHashesMsg) error {
+func (p *Peer) handleOfferedHashesMsg(req *OfferedHashesMsg) error {
 	metrics.GetOrRegisterCounter("peer.handleofferedhashes", nil).Inc(1)
 
-	var sp opentracing.Span
-	ctx, sp = spancontext.StartSpan(
-		ctx,
+	// var sp opentracing.Span
+	ctx, sp := spancontext.StartSpan(
+		// ctx,
 		"handle.offered.hashes")
 	defer sp.Finish()
 
@@ -300,7 +299,7 @@ func (p *Peer) handleOfferedHashesMsg(ctx context.Context, req *OfferedHashesMsg
 			return
 		}
 		log.Trace("sending want batch", "peer", p.ID(), "stream", msg.Stream, "from", msg.From, "to", msg.To)
-		err := p.SendPriority(ctx, msg, c.priority)
+		err := p.SendPriority(msg, c.priority)
 		if err != nil {
 			log.Warn("SendPriority error", "err", err)
 		}
@@ -324,7 +323,7 @@ func (m WantedHashesMsg) String() string {
 // handleWantedHashesMsg protocol msg handler
 // * sends the next batch of unsynced keys
 // * sends the actual data chunks as per WantedHashesMsg
-func (p *Peer) handleWantedHashesMsg(ctx context.Context, req *WantedHashesMsg) error {
+func (p *Peer) handleWantedHashesMsg(req *WantedHashesMsg) error {
 	metrics.GetOrRegisterCounter("peer.handlewantedhashesmsg", nil).Inc(1)
 
 	log.Trace("received wanted batch", "peer", p.ID(), "stream", req.Stream, "from", req.From, "to", req.To)
@@ -347,6 +346,7 @@ func (p *Peer) handleWantedHashesMsg(ctx context.Context, req *WantedHashesMsg) 
 	if err != nil {
 		return fmt.Errorf("error initiaising bitvector of length %v: %v", l, err)
 	}
+	ctx := context.TODO()
 	for i := 0; i < l; i++ {
 		if want.Get(i) {
 			metrics.GetOrRegisterCounter("peer.handlewantedhashesmsg.actualget", nil).Inc(1)
@@ -398,7 +398,7 @@ func (m TakeoverProofMsg) String() string {
 	return fmt.Sprintf("Stream: '%v' [%v-%v], Root: %x, Sig: %x", m.Stream, m.Start, m.End, m.Root, m.Sig)
 }
 
-func (p *Peer) handleTakeoverProofMsg(ctx context.Context, req *TakeoverProofMsg) error {
+func (p *Peer) handleTakeoverProofMsg(req *TakeoverProofMsg) error {
 	_, err := p.getServer(req.Stream)
 	// store the strongest takeoverproof for the stream in streamer
 	return err

@@ -17,8 +17,10 @@
 package network
 
 import (
+	"net"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	p2ptest "github.com/ethereum/go-ethereum/p2p/testing"
 )
 
@@ -31,7 +33,9 @@ func TestDiscovery(t *testing.T) {
 	params := NewHiveParams()
 	s, pp := newHiveTester(t, params, 1, nil)
 
-	node := s.Nodes[0]
+	nid := s.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
+
 	raddr := NewAddr(node)
 	pp.Register(raddr)
 
@@ -46,7 +50,7 @@ func TestDiscovery(t *testing.T) {
 			{
 				Code: 1,
 				Msg:  &subPeersMsg{Depth: 0},
-				Peer: node.ID(),
+				Peer: node.ID,
 			},
 		},
 	})

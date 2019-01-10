@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -572,7 +573,7 @@ func TestAddressMatchProx(t *testing.T) {
 		}
 
 		log.Trace("withprox addrs", "local", localAddr, "remote", remoteAddr)
-		ps.handlePssMsg(context.TODO(), pssMsg)
+		ps.handlePssMsg(pssMsg)
 		if (!expects[i] && prevReceive != receives) || (expects[i] && prevReceive == receives) {
 			t.Fatalf("expected distance %d recipient %v when prox is set for handler", distance, expects[i])
 		}
@@ -603,7 +604,7 @@ func TestAddressMatchProx(t *testing.T) {
 		}
 
 		log.Trace("withprox addrs", "local", localAddr, "remote", remoteAddr)
-		ps.handlePssMsg(context.TODO(), pssMsg)
+		ps.handlePssMsg(pssMsg)
 		if (!expects[i] && prevReceive != receives) || (expects[i] && prevReceive == receives) {
 			t.Fatalf("expected distance %d recipient %v when prox is set for handler", distance, expects[i])
 		}
@@ -627,7 +628,7 @@ func TestAddressMatchProx(t *testing.T) {
 		}
 
 		log.Trace("noprox addrs", "local", localAddr, "remote", remoteAddr)
-		ps.handlePssMsg(context.TODO(), pssMsg)
+		ps.handlePssMsg(pssMsg)
 		if receives != 0 {
 			t.Fatalf("expected distance %d to not be recipient when prox is not set for handler", distance)
 		}
@@ -657,7 +658,7 @@ func TestMessageProcessing(t *testing.T) {
 		Topic: [4]byte{},
 		Data:  []byte{0x66, 0x6f, 0x6f},
 	}
-	if err := ps.handlePssMsg(context.TODO(), msg); err != nil {
+	if err := ps.handlePssMsg(msg); err != nil {
 		t.Fatal(err.Error())
 	}
 	tmr := time.NewTimer(time.Millisecond * 100)
@@ -674,7 +675,7 @@ func TestMessageProcessing(t *testing.T) {
 	// message should pass and queue due to partial length
 	msg.To = addr[0:1]
 	msg.Payload.Data = []byte{0x78, 0x79, 0x80, 0x80, 0x79}
-	if err := ps.handlePssMsg(context.TODO(), msg); err != nil {
+	if err := ps.handlePssMsg(msg); err != nil {
 		t.Fatal(err.Error())
 	}
 	tmr.Reset(time.Millisecond * 100)
@@ -697,7 +698,7 @@ func TestMessageProcessing(t *testing.T) {
 
 	// full address mismatch should put message in queue
 	msg.To[0] = 0xff
-	if err := ps.handlePssMsg(context.TODO(), msg); err != nil {
+	if err := ps.handlePssMsg(msg); err != nil {
 		t.Fatal(err.Error())
 	}
 	tmr.Reset(time.Millisecond * 10)
@@ -720,7 +721,7 @@ func TestMessageProcessing(t *testing.T) {
 
 	// expired message should be dropped
 	msg.Expire = uint32(time.Now().Add(-time.Second).Unix())
-	if err := ps.handlePssMsg(context.TODO(), msg); err != nil {
+	if err := ps.handlePssMsg(msg); err != nil {
 		t.Fatal(err.Error())
 	}
 	tmr.Reset(time.Millisecond * 10)
@@ -740,7 +741,7 @@ func TestMessageProcessing(t *testing.T) {
 	}{
 		pssMsg: &PssMsg{},
 	}
-	if err := ps.handlePssMsg(context.TODO(), fckedupmsg); err == nil {
+	if err := ps.handlePssMsg(fckedupmsg); err == nil {
 		t.Fatalf("expected error from processMsg but error nil")
 	}
 
@@ -750,7 +751,7 @@ func TestMessageProcessing(t *testing.T) {
 		ps.outbox <- msg
 	}
 	msg.Payload.Data = []byte{0x62, 0x61, 0x72}
-	err = ps.handlePssMsg(context.TODO(), msg)
+	err = ps.handlePssMsg(msg)
 	if err == nil {
 		t.Fatal("expected error when mailbox full, but was nil")
 	}
@@ -975,7 +976,7 @@ func TestRawAllow(t *testing.T) {
 	pssMsg.Payload = &whisper.Envelope{
 		Topic: whisper.TopicType(topic),
 	}
-	ps.handlePssMsg(context.TODO(), pssMsg)
+	ps.handlePssMsg(pssMsg)
 	if receives > 0 {
 		t.Fatalf("Expected handler not to be executed with raw cap off")
 	}
@@ -991,7 +992,7 @@ func TestRawAllow(t *testing.T) {
 
 	// should work now
 	pssMsg.Payload.Data = []byte("Raw Deal")
-	ps.handlePssMsg(context.TODO(), pssMsg)
+	ps.handlePssMsg(pssMsg)
 	if receives == 0 {
 		t.Fatalf("Expected handler to be executed with raw cap on")
 	}
@@ -1002,7 +1003,7 @@ func TestRawAllow(t *testing.T) {
 
 	// check that raw messages fail again
 	pssMsg.Payload.Data = []byte("Raw Trump")
-	ps.handlePssMsg(context.TODO(), pssMsg)
+	ps.handlePssMsg(pssMsg)
 	if receives != prevReceives {
 		t.Fatalf("Expected handler not to be executed when raw handler is retracted")
 	}
@@ -1425,7 +1426,7 @@ func testNetwork(t *testing.T) {
 		}
 		a = adapters.NewExecAdapter(dirname)
 	} else if adapter == "tcp" {
-		a = adapters.NewTCPAdapter(newServices(false))
+		a = adapters.NewSimAdapter(newServices(false))
 	} else if adapter == "sim" {
 		a = adapters.NewSimAdapter(newServices(false))
 	}
@@ -2027,7 +2028,8 @@ func newServices(allowRaw bool) adapters.Services {
 			return ps, nil
 		},
 		"bzz": func(ctx *adapters.ServiceContext) (node.Service, error) {
-			addr := network.NewAddr(ctx.Config.Node())
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
+			addr := network.NewAddr(node)
 			hp := network.NewHiveParams()
 			hp.Discovery = false
 			config := &network.BzzConfig{
@@ -2041,7 +2043,8 @@ func newServices(allowRaw bool) adapters.Services {
 }
 
 func newTestPss(privkey *ecdsa.PrivateKey, kad *network.Kademlia, ppextra *PssParams) *Pss {
-	nid := enode.PubkeyToIDV4(&privkey.PublicKey)
+	// nid := enode.PubkeyToIDV4(&privkey.PublicKey)
+	nid := discover.PubkeyID(&privkey.PublicKey)
 	// set up routing if kademlia is not passed to us
 	if kad == nil {
 		kp := network.NewKadParams()

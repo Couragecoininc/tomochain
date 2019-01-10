@@ -21,16 +21,17 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/simulations/adapters"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/network"
 	"github.com/ethereum/go-ethereum/swarm/network/simulation"
 	"github.com/ethereum/go-ethereum/swarm/state"
@@ -74,15 +75,16 @@ func testSyncBetweenNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck 
 			var store storage.ChunkStore
 			var datadir string
 
-			node := ctx.Config.Node()
+			// node := ctx.Config.Node()
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
 			//hack to put addresses in same space
 			addr.OAddr[0] = byte(0)
 
 			if *useMockStore {
-				store, datadir, err = createMockStore(mockmem.NewGlobalStore(), node.ID(), addr)
+				store, datadir, err = createMockStore(mockmem.NewGlobalStore(), node.ID, addr)
 			} else {
-				store, datadir, err = createTestLocalStorageForID(node.ID(), addr)
+				store, datadir, err = createTestLocalStorageForID(node.ID, addr)
 			}
 			if err != nil {
 				return nil, nil, err
@@ -108,7 +110,7 @@ func testSyncBetweenNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck 
 				Retrieval: RetrievalDisabled,
 				Syncing:   SyncingAutoSubscribe,
 				SkipCheck: skipCheck,
-			}, nil)
+			})
 
 			fileStore := storage.NewFileStore(netStore, storage.NewFileStoreParams())
 			bucket.Store(bucketKeyFileStore, fileStore)
@@ -244,10 +246,11 @@ func TestSameVersionID(t *testing.T) {
 			var store storage.ChunkStore
 			var datadir string
 
-			node := ctx.Config.Node()
+			// node := ctx.Config.Node()
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
 
-			store, datadir, err = createTestLocalStorageForID(node.ID(), addr)
+			store, datadir, err = createTestLocalStorageForID(node.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -271,7 +274,7 @@ func TestSameVersionID(t *testing.T) {
 			r := NewRegistry(addr.ID(), delivery, netStore, state.NewInmemoryStore(), &RegistryOptions{
 				Retrieval: RetrievalDisabled,
 				Syncing:   SyncingAutoSubscribe,
-			}, nil)
+			})
 			//assign to each node the same version ID
 			r.spec.Version = v
 
@@ -326,10 +329,11 @@ func TestDifferentVersionID(t *testing.T) {
 			var store storage.ChunkStore
 			var datadir string
 
-			node := ctx.Config.Node()
+			// node := ctx.Config.Node()
+			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
 
-			store, datadir, err = createTestLocalStorageForID(node.ID(), addr)
+			store, datadir, err = createTestLocalStorageForID(node.ID, addr)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -353,7 +357,7 @@ func TestDifferentVersionID(t *testing.T) {
 			r := NewRegistry(addr.ID(), delivery, netStore, state.NewInmemoryStore(), &RegistryOptions{
 				Retrieval: RetrievalDisabled,
 				Syncing:   SyncingAutoSubscribe,
-			}, nil)
+			})
 
 			//increase the version ID for each node
 			v++

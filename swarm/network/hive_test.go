@@ -19,9 +19,11 @@ package network
 import (
 	"io/ioutil"
 	"log"
+	"net"
 	"os"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/p2p/discover"
 	p2ptest "github.com/ethereum/go-ethereum/p2p/testing"
 	"github.com/ethereum/go-ethereum/swarm/state"
 )
@@ -39,7 +41,8 @@ func TestRegisterAndConnect(t *testing.T) {
 	params := NewHiveParams()
 	s, pp := newHiveTester(t, params, 1, nil)
 
-	node := s.Nodes[0]
+	nid := s.IDs[0]
+	node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 	raddr := NewAddr(node)
 	pp.Register(raddr)
 
@@ -51,7 +54,7 @@ func TestRegisterAndConnect(t *testing.T) {
 	defer pp.Stop()
 	// retrieve and broadcast
 	err = s.TestDisconnected(&p2ptest.Disconnect{
-		Peer:  s.Nodes[0].ID(),
+		Peer:  node.ID,
 		Error: nil,
 	})
 
@@ -78,7 +81,8 @@ func TestHiveStatePersistance(t *testing.T) {
 	s, pp := newHiveTester(t, params, 5, store)
 
 	peers := make(map[string]bool)
-	for _, node := range s.Nodes {
+	for _, nid := range s.IDs {
+		node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
 		raddr := NewAddr(node)
 		pp.Register(raddr)
 		peers[raddr.String()] = true

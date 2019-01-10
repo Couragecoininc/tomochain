@@ -180,6 +180,23 @@ func (self *SimNode) Client() (*rpc.Client, error) {
 	return self.client, nil
 }
 
+// ServiceMap returns a map by names of the underlying services
+func (sn *SimNode) ServiceMap() map[string]node.Service {
+	sn.lock.RLock()
+	defer sn.lock.RUnlock()
+	services := make(map[string]node.Service, len(sn.running))
+	for name, service := range sn.running {
+		services[name] = service
+	}
+	return services
+}
+
+func (sn *SimNode) Service(name string) node.Service {
+	sn.lock.RLock()
+	defer sn.lock.RUnlock()
+	return sn.running[name]
+}
+
 // ServeRPC serves RPC requests over the given connection by creating an
 // in-memory client to the node's RPC server
 func (self *SimNode) ServeRPC(conn net.Conn) error {

@@ -17,7 +17,6 @@
 package network
 
 import (
-	"context"
 	"fmt"
 	"sync"
 
@@ -49,7 +48,7 @@ func NewPeer(p *BzzPeer, kad *Kademlia) *Peer {
 }
 
 // HandleMsg is the message handler that delegates incoming messages
-func (d *Peer) HandleMsg(ctx context.Context, msg interface{}) error {
+func (d *Peer) HandleMsg(msg interface{}) error {
 	switch msg := msg.(type) {
 
 	case *peersMsg:
@@ -93,13 +92,17 @@ func (d *Peer) NotifyPeer(a *BzzAddr, po uint8) {
 	resp := &peersMsg{
 		Peers: []*BzzAddr{a},
 	}
-	go d.Send(context.TODO(), resp)
+	// go d.Send(context.TODO(), resp)
+	// old version do not have context
+	go d.Send(resp)
 }
 
 // NotifyDepth sends a subPeers Msg to the receiver notifying them about
 // a change in the depth of saturation
 func (d *Peer) NotifyDepth(po uint8) {
-	go d.Send(context.TODO(), &subPeersMsg{Depth: po})
+	// go d.Send(context.TODO(), &subPeersMsg{Depth: po})
+	resp := &subPeersMsg{Depth: po}
+	go d.Send(resp)
 }
 
 /*
@@ -170,7 +173,8 @@ func (d *Peer) handleSubPeersMsg(msg *subPeersMsg) error {
 			return true
 		})
 		if len(peers) > 0 {
-			go d.Send(context.TODO(), &peersMsg{Peers: peers})
+			// go d.Send(context.TODO(), &peersMsg{Peers: peers})
+			go d.Send(&peersMsg{Peers: peers})
 		}
 	}
 	d.sentPeers = true

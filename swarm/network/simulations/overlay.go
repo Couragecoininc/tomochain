@@ -22,6 +22,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"runtime"
 	"sync"
@@ -74,12 +75,13 @@ func NewSimulation() *Simulation {
 }
 
 func (s *Simulation) NewService(ctx *adapters.ServiceContext) (node.Service, error) {
-	node := ctx.Config.Node()
+	node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
+	// node := ctx.Config.Node()
 	s.mtx.Lock()
-	store, ok := s.stores[node.ID()]
+	store, ok := s.stores[node.ID]
 	if !ok {
 		store = state.NewInmemoryStore()
-		s.stores[node.ID()] = store
+		s.stores[node.ID] = store
 	}
 	s.mtx.Unlock()
 

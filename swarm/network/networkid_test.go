@@ -22,6 +22,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -199,7 +200,9 @@ func newServices() adapters.Services {
 	}
 	return adapters.Services{
 		"bzz": func(ctx *adapters.ServiceContext) (node.Service, error) {
-			addr := NewAddr(ctx.Config.Node())
+			nid := ctx.Config.ID
+			node := discover.NewNode(nid, net.IP{127, 0, 0, 1}, 30303, 30303)
+			addr := NewAddr(node)
 			hp := NewHiveParams()
 			hp.Discovery = false
 			cnt++
