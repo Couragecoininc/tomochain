@@ -26,12 +26,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
 	"github.com/ethereum/go-ethereum/p2p/protocols"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/pss"
 )
 
@@ -277,6 +277,7 @@ func (c *Client) RunProtocol(ctx context.Context, proto *p2p.Protocol) error {
 						log.Trace(err.Error())
 						break
 					}
+
 					addr := pss.PssAddress(addrbytes)
 					rw, err := c.newpssRPCRW(pubkeyid, addr, topicobj)
 					if err != nil {

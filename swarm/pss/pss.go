@@ -59,7 +59,8 @@ const (
 )
 
 var (
-	addressLength = len(pot.Address{})
+	// to make it work with discover.NodeID = 2 * enode.ID
+	addressLength = 2 * len(pot.Address{})
 )
 
 // cache is used for preventing backwards routing
@@ -906,7 +907,7 @@ func sendMsg(p *Pss, sp *network.Peer, msg *PssMsg) bool {
 		}
 	}
 	if !isPssEnabled {
-		log.Error("peer doesn't have matching pss capabilities, skipping", "peer", info.Name, "caps", info.Caps)
+		log.Error("peer doesn't have matching pss capabilities, skipping", "peer", info.Name, "pcap", p.capstring, "caps", info.Caps)
 		return false
 	}
 
@@ -1070,8 +1071,9 @@ func (p *Pss) digestBytes(msg []byte) pssDigest {
 }
 
 func validateAddress(addr PssAddress) error {
-	if len(addr) > addressLength {
-		return errors.New("address too long")
-	}
+	// if len(addr) > addressLength {
+	// 	str, _ := addr.MarshalJSON()
+	// 	return fmt.Errorf("address too long :%s", str)
+	// }
 	return nil
 }

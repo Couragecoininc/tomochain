@@ -138,9 +138,9 @@ func TestStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	pubkey, err := crypto.UnmarshalPubkey(pubkeybytes)
-	if err != nil {
-		t.Fatal(err)
+	pubkey := crypto.ToECDSAPub(pubkeybytes)
+	if pubkey == nil {
+		t.Fatal(fmt.Errorf("Can not unmarshal key : %v", pubkey))
 	}
 	addrbytes, err := hexutil.Decode(leftAddr)
 	if err != nil {

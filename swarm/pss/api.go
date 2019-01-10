@@ -134,7 +134,7 @@ func (pssapi *API) SetPeerPublicKey(pubkey hexutil.Bytes, topic Topic, addr PssA
 	}
 	err := pssapi.Pss.SetPeerPublicKey(pk, topic, addr)
 	if err != nil {
-		return fmt.Errorf("Invalid key: %x", pk)
+		return fmt.Errorf("Invalid key: %x, %v", pk, err)
 	}
 	return nil
 }

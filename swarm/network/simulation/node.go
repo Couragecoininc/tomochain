@@ -154,13 +154,12 @@ func (s *Simulation) AddNodesAndConnectChain(count int, opts ...AddNodeOption) (
 	if err != nil {
 		return nil, err
 	}
-	ids = s.getNodeIDs()
-	last := ids[len(ids)-1]
-	err = s.Net.Connect(last, id)
-	// err = s.Net.ConnectToLastNode(id)
+
+	err = s.connectToLastNode(id)
 	if err != nil {
 		return nil, err
 	}
+
 	ids, err = s.AddNodes(count-1, opts...)
 	if err != nil {
 		return nil, err
@@ -312,6 +311,21 @@ func (s *Simulation) getNodeIDs() (ids []discover.NodeID) {
 		ids = append(ids, node.ID())
 	}
 	return ids
+}
+
+func (s *Simulation) connectToLastNode(id discover.NodeID) (err error) {
+	upIDs := s.getUpNodeIDs()
+	// fmt.Println(upIDs)
+	l := len(upIDs)
+	if l < 2 {
+		return nil
+	}
+	last := upIDs[l-1]
+	if last == id {
+		last = upIDs[l-2]
+	}
+	return s.Net.Connect(last, id)
+
 }
 
 func (s *Simulation) getUpNodeIDs() (ids []discover.NodeID) {

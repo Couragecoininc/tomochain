@@ -76,6 +76,7 @@ func testSyncBetweenNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck 
 			var datadir string
 
 			// node := ctx.Config.Node()
+			// fmt.Println("PORT", ctx.NodeContext.GetConfig())
 			node := discover.NewNode(ctx.Config.ID, net.IP{127, 0, 0, 1}, 30303, 30303)
 			addr := network.NewAddr(node)
 			//hack to put addresses in same space
@@ -126,7 +127,7 @@ func testSyncBetweenNodes(t *testing.T, nodes, conns, chunkCount int, skipCheck 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	// defer cancel should come before defer simulation teardown
 	defer cancel()
-
+	// fmt.Println(nodes)
 	_, err := sim.AddNodesAndConnectChain(nodes)
 	if err != nil {
 		t.Fatal(err)

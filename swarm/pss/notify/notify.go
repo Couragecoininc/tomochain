@@ -7,9 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/pss"
 )
 
@@ -290,9 +290,9 @@ func (c *Controller) handleStartMsg(msg *Msg, keyid string) (err error) {
 	if err != nil {
 		return err
 	}
-	pubkey, err := crypto.UnmarshalPubkey(keyidbytes)
-	if err != nil {
-		return err
+	pubkey := crypto.ToECDSAPub(keyidbytes)
+	if pubkey == nil {
+		return fmt.Errorf("Can not unmarshal key : %v", pubkey)
 	}
 
 	// if name is not registered for notifications we will not react
