@@ -137,8 +137,8 @@ func NewSwap(localProfile *LocalProfile, remoteProfile *RemoteProfile, backend c
 		out *chequebook.Outbox
 	)
 
-	remotekey, err := crypto.UnmarshalPubkey(common.FromHex(remoteProfile.PublicKey))
-	if err != nil {
+	remotekey := crypto.ToECDSAPub(common.FromHex(remoteProfile.PublicKey))
+	if remotekey == nil {
 		return nil, errors.New("invalid remote public key")
 	}
 
