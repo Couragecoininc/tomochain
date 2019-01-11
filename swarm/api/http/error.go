@@ -31,7 +31,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/swarm/api"
-	l "github.com/ethereum/go-ethereum/log"
 )
 
 //templateMap holds a mapping of an HTTP error code to a template
@@ -72,7 +71,7 @@ func initErrHandling() {
 	multipleChoicesPage := GetMultipleChoicesErrorPage()
 	//map the codes to the available pages
 	tnames := map[int]string{
-		0: genErrPage, //default
+		0:                              genErrPage, //default
 		http.StatusBadRequest:          genErrPage,
 		http.StatusNotFound:            notFoundPage,
 		http.StatusMultipleChoices:     multipleChoicesPage,
@@ -146,9 +145,9 @@ func Respond(w http.ResponseWriter, req *Request, msg string, code int) {
 	additionalMessage := ValidateCaseErrors(req)
 	switch code {
 	case http.StatusInternalServerError:
-		log.Output(msg, log.LvlError, l.CallDepth, "ruid", req.ruid, "code", code)
+		log.Error(msg, "ruid", req.ruid, "code", code)
 	default:
-		log.Output(msg, log.LvlDebug, l.CallDepth, "ruid", req.ruid, "code", code)
+		log.Info(msg, "ruid", req.ruid, "code", code)
 	}
 
 	if code >= 400 {

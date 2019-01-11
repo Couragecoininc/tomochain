@@ -24,13 +24,13 @@ import (
 	"fmt"
 	"math/big"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"golang.org/x/net/idna"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/contracts/ens"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
@@ -52,6 +52,23 @@ const (
 type blockEstimator struct {
 	Start   time.Time
 	Average time.Duration
+}
+
+// split name into node and label
+func ensParentNode(name string) (common.Hash, common.Hash) {
+	parts := strings.SplitN(name, ".", 2)
+	label := crypto.Keccak256Hash([]byte(parts[0]))
+	if len(parts) == 1 {
+		return [32]byte{}, label
+	} else {
+		parentNode, parentLabel := ensParentNode(parts[1])
+		return crypto.Keccak256Hash(parentNode[:], parentLabel[:]), label
+	}
+}
+
+func EnsNode(name string) common.Hash {
+	parentNode, parentLabel := ensParentNode(name)
+	return crypto.Keccak256Hash(parentNode[:], parentLabel[:])
 }
 
 // TODO: Average must  be adjusted when blockchain connection is present and synced
@@ -296,7 +313,7 @@ func (h *Handler) Validate(addr storage.Address, data []byte) bool {
 		log.Error("Invalid resource chunk")
 		return false
 	} else if signature == nil {
-		return bytes.Equal(h.resourceHash(period, version, ens.EnsNode(name)), addr)
+		return bytes.Equal(h.resourceHash(period, version, EnsNode(name)), addr)
 	}
 
 	digest := h.keyDataHash(addr, parseddata)
@@ -385,7 +402,7 @@ func (h *Handler) New(ctx context.Context, name string, frequency uint64) (stora
 		return nil, nil, NewError(ErrInvalidValue, fmt.Sprintf("Invalid name: '%s'", name))
 	}
 
-	nameHash := ens.EnsNode(name)
+	nameHash := EnsNode(name)
 
 	// if the signer function is set, validate that the key of the signer has access to modify this ENS name
 	if h.signer != nil {
@@ -467,7 +484,7 @@ func (h *Handler) newMetaChunk(name string, startBlock uint64, frequency uint64)
 // It is the callers responsibility to make sure that this chunk exists (if the resource
 // update root data was retrieved externally, it typically doesn't)
 func (h *Handler) LookupVersionByName(ctx context.Context, name string, period uint32, version uint32, refresh bool, maxLookup *LookupParams) (*resource, error) {
-	return h.LookupVersion(ctx, ens.EnsNode(name), period, version, refresh, maxLookup)
+	return h.LookupVersion(ctx, EnsNode(name), period, version, refresh, maxLookup)
 }
 
 func (h *Handler) LookupVersion(ctx context.Context, nameHash common.Hash, period uint32, version uint32, refresh bool, maxLookup *LookupParams) (*resource, error) {
@@ -487,7 +504,7 @@ func (h *Handler) LookupVersion(ctx context.Context, nameHash common.Hash, perio
 //
 // See also (*Handler).LookupVersion
 func (h *Handler) LookupHistoricalByName(ctx context.Context, name string, period uint32, refresh bool, maxLookup *LookupParams) (*resource, error) {
-	return h.LookupHistorical(ctx, ens.EnsNode(name), period, refresh, maxLookup)
+	return h.LookupHistorical(ctx, EnsNode(name), period, refresh, maxLookup)
 }
 
 func (h *Handler) LookupHistorical(ctx context.Context, nameHash common.Hash, period uint32, refresh bool, maxLookup *LookupParams) (*resource, error) {
@@ -509,7 +526,7 @@ func (h *Handler) LookupHistorical(ctx context.Context, nameHash common.Hash, pe
 //
 // See also (*Handler).LookupHistorical
 func (h *Handler) LookupLatestByName(ctx context.Context, name string, refresh bool, maxLookup *LookupParams) (*resource, error) {
-	return h.LookupLatest(ctx, ens.EnsNode(name), refresh, maxLookup)
+	return h.LookupLatest(ctx, EnsNode(name), refresh, maxLookup)
 }
 
 func (h *Handler) LookupLatest(ctx context.Context, nameHash common.Hash, refresh bool, maxLookup *LookupParams) (*resource, error) {
@@ -537,7 +554,7 @@ func (h *Handler) LookupLatest(ctx context.Context, nameHash common.Hash, refres
 //
 // Requires a synced resource object
 func (h *Handler) LookupPreviousByName(ctx context.Context, name string, maxLookup *LookupParams) (*resource, error) {
-	return h.LookupPrevious(ctx, ens.EnsNode(name), maxLookup)
+	return h.LookupPrevious(ctx, EnsNode(name), maxLookup)
 }
 
 func (h *Handler) LookupPrevious(ctx context.Context, nameHash common.Hash, maxLookup *LookupParams) (*resource, error) {
@@ -638,7 +655,7 @@ func (h *Handler) Load(addr storage.Address) (*resource, error) {
 	// create the index entry
 	rsrc := &resource{}
 	rsrc.UnmarshalBinary(chunk.SData[2:])
-	rsrc.nameHash = ens.EnsNode(rsrc.name)
+	rsrc.nameHash = EnsNode(rsrc.name)
 	h.set(rsrc.nameHash.Hex(), rsrc)
 	log.Trace("resource index load", "rootkey", addr, "name", rsrc.name, "namehash", rsrc.nameHash, "startblock", rsrc.startBlock, "frequency", rsrc.frequency)
 	return rsrc, nil
@@ -817,7 +834,7 @@ func (h *Handler) update(ctx context.Context, name string, data []byte, multihas
 	}
 
 	// get the cached information
-	nameHash := ens.EnsNode(name)
+	nameHash := EnsNode(name)
 	nameHashHex := nameHash.Hex()
 	rsrc := h.get(nameHashHex)
 	if rsrc == nil {

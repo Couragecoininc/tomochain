@@ -41,6 +41,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/multihash"
 	"github.com/ethereum/go-ethereum/swarm/storage"
+	"github.com/ethereum/go-ethereum/swarm/storage/mru"
 )
 
 var (
@@ -64,7 +65,7 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
-	nameHash = ens.EnsNode(safeName)
+	nameHash = mru.EnsNode(safeName)
 }
 
 // simulated backend does not have the blocknumber call
@@ -109,7 +110,7 @@ func TestReverse(t *testing.T) {
 	defer teardownTest()
 
 	// generate a hash for block 4200 version 1
-	key := rh.resourceHash(period, version, ens.EnsNode(safeName))
+	key := rh.resourceHash(period, version, mru.EnsNode(safeName))
 
 	// generate some bogus data for the chunk and sign it
 	data := make([]byte, 8)
@@ -406,7 +407,7 @@ func TestMultihash(t *testing.T) {
 
 	// we're naïvely assuming keccak256 for swarm hashes
 	// if it ever changes this test should also change
-	multihashbytes := ens.EnsNode("foo")
+	multihashbytes := mru.EnsNode("foo")
 	multihashmulti := multihash.ToMultihash(multihashbytes.Bytes())
 	multihashkey, err := rh.UpdateMultihash(ctx, safeName, multihashmulti)
 	if err != nil {
@@ -599,7 +600,7 @@ func TestValidator(t *testing.T) {
 	goodChunk := chunks[0]
 	badChunk := chunks[1]
 	badChunk.SData = goodChunk.SData
-	key := rh.resourceHash(42, 1, ens.EnsNode("xyzzy.eth"))
+	key := rh.resourceHash(42, 1, mru.EnsNode("xyzzy.eth"))
 	data := []byte("bar")
 	uglyChunk := newUpdateChunk(key, nil, 42, 1, "xyzzy.eth", data, len(data))
 
@@ -625,7 +626,7 @@ func TestValidator(t *testing.T) {
 	badChunk = chunks[1]
 	badChunk.SData = goodChunk.SData
 
-	key = rh.resourceHash(42, 2, ens.EnsNode("xyzzy.eth"))
+	key = rh.resourceHash(42, 2, mru.EnsNode("xyzzy.eth"))
 	data = []byte("baz")
 	uglyChunk = newUpdateChunk(key, nil, 42, 2, "xyzzy.eth", data, len(data))
 
@@ -653,7 +654,7 @@ type ensOwnerValidator struct {
 }
 
 func (e ensOwnerValidator) ValidateOwner(name string, address common.Address) (bool, error) {
-	addr, err := e.Owner(ens.EnsNode(name))
+	addr, err := e.Owner(mru.EnsNode(name))
 	if err != nil {
 		return false, err
 	}
@@ -735,7 +736,7 @@ func setupENS(addr common.Address, transactOpts *bind.TransactOpts, sub string, 
 	}
 	contractBackend.Commit()
 
-	if _, err = ensinstance.SetSubnodeOwner(transactOpts, ens.EnsNode(top), subhash, addr); err != nil {
+	if _, err = ensinstance.SetSubnodeOwner(transactOpts, mru.EnsNode(top), subhash, addr); err != nil {
 		return zeroAddr, nil, fmt.Errorf("can't register top: %v", err)
 	}
 	contractBackend.Commit()
