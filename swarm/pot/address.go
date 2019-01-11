@@ -175,6 +175,9 @@ func DefaultPof(max int) func(one, other Val, pos int) (int, bool) {
 }
 
 func proximityOrder(one, other []byte, pos int) (int, bool) {
+	if len(other) != len(one) {
+		return 0, false
+	}
 	for i := pos / 8; i < len(one); i++ {
 		if one[i] == other[i] {
 			continue

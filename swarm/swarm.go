@@ -38,7 +38,6 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/discover"
-	"github.com/ethereum/go-ethereum/p2p/protocols"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/swarm/api"
@@ -66,20 +65,20 @@ var (
 
 // the swarm stack
 type Swarm struct {
-	config            *api.Config        // swarm configuration
-	api               *api.API           // high level api layer (fs/manifest)
-	dns               api.Resolver       // DNS registrar
-	fileStore         *storage.FileStore // distributed preimage archive, the local API to the storage with document level storage/retrieval support
-	streamer          *stream.Registry
-	bzz               *network.Bzz       // the logistic manager
-	backend           chequebook.Backend // simple blockchain Backend
-	privateKey        *ecdsa.PrivateKey
-	netStore          *storage.NetStore
-	sfs               *fuse.SwarmFS // need this to cleanup all the active mounts on node exit
-	ps                *pss.Pss
-	swap              *swap.Swap
-	stateStore        *state.DBStore
-	accountingMetrics *protocols.AccountingMetrics
+	config     *api.Config        // swarm configuration
+	api        *api.API           // high level api layer (fs/manifest)
+	dns        api.Resolver       // DNS registrar
+	fileStore  *storage.FileStore // distributed preimage archive, the local API to the storage with document level storage/retrieval support
+	streamer   *stream.Registry
+	bzz        *network.Bzz       // the logistic manager
+	backend    chequebook.Backend // simple blockchain Backend
+	privateKey *ecdsa.PrivateKey
+	netStore   *storage.NetStore
+	sfs        *fuse.SwarmFS // need this to cleanup all the active mounts on node exit
+	ps         *pss.Pss
+	swap       *swap.Swap
+	stateStore *state.DBStore
+	// accountingMetrics *protocols.AccountingMetrics
 
 	tracerClose io.Closer
 }
@@ -167,7 +166,7 @@ func NewSwarm(config *api.Config, mockStore *mock.NodeStore) (self *Swarm, err e
 			return nil, err
 		}
 		self.swap = swap.New(balancesStore)
-		self.accountingMetrics = protocols.SetupAccountingMetrics(10*time.Second, filepath.Join(config.Path, "metrics.db"))
+		// self.accountingMetrics = protocols.SetupAccountingMetrics(10*time.Second, filepath.Join(config.Path, "metrics.db"))
 	}
 
 	var nodeID discover.NodeID
@@ -438,9 +437,9 @@ func (self *Swarm) Stop() error {
 	if self.swap != nil {
 		self.swap.Close()
 	}
-	if self.accountingMetrics != nil {
-		self.accountingMetrics.Close()
-	}
+	// if self.accountingMetrics != nil {
+	// 	self.accountingMetrics.Close()
+	// }
 	if self.netStore != nil {
 		self.netStore.Close()
 	}
@@ -496,12 +495,12 @@ func (self *Swarm) APIs() []rpc.API {
 			Service:   self.sfs,
 			Public:    false,
 		},
-		{
-			Namespace: "accounting",
-			Version:   protocols.AccountingVersion,
-			Service:   protocols.NewAccountingApi(self.accountingMetrics),
-			Public:    false,
-		},
+		// {
+		// 	Namespace: "accounting",
+		// 	Version:   protocols.AccountingVersion,
+		// 	Service:   protocols.NewAccountingApi(self.accountingMetrics),
+		// 	Public:    false,
+		// },
 	}
 
 	apis = append(apis, self.bzz.APIs()...)

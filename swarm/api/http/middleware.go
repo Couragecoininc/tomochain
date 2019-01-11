@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/swarm/api"
-	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/swarm/sctx"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
 	"github.com/pborman/uuid"
@@ -94,7 +94,10 @@ func InstrumentOpenTracing(h http.Handler) http.Handler {
 			return
 		}
 		spanName := fmt.Sprintf("http.%s.%s", r.Method, uri.Scheme)
-		ctx, sp := spancontext.StartSpan(r.Context(), spanName)
+		ctx, sp := spancontext.StartSpan(
+			// r.Context(),
+			spanName,
+		)
 
 		defer sp.Finish()
 		h.ServeHTTP(w, r.WithContext(ctx))

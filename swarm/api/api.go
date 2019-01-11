@@ -38,10 +38,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/contracts/ens"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/metrics"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/swarm/spancontext"
 	"github.com/ethereum/go-ethereum/swarm/storage"
 	"github.com/ethereum/go-ethereum/swarm/storage/feed"
@@ -132,11 +132,28 @@ func MultiResolverOptionWithResolver(r ResolveValidator, tld string) MultiResolv
 	}
 }
 
+// split name into node and label
+func ensParentNode(name string) (common.Hash, common.Hash) {
+	parts := strings.SplitN(name, ".", 2)
+	label := crypto.Keccak256Hash([]byte(parts[0]))
+	if len(parts) == 1 {
+		return [32]byte{}, label
+	} else {
+		parentNode, parentLabel := ensParentNode(parts[1])
+		return crypto.Keccak256Hash(parentNode[:], parentLabel[:]), label
+	}
+}
+
+func EnsNode(name string) common.Hash {
+	parentNode, parentLabel := ensParentNode(name)
+	return crypto.Keccak256Hash(parentNode[:], parentLabel[:])
+}
+
 // NewMultiResolver creates a new instance of MultiResolver.
 func NewMultiResolver(opts ...MultiResolverOption) (m *MultiResolver) {
 	m = &MultiResolver{
 		resolvers: make(map[string][]ResolveValidator),
-		nameHash:  ens.EnsNode,
+		nameHash:  EnsNode,
 	}
 	for _, o := range opts {
 		o(m)
@@ -244,7 +261,7 @@ func (a *API) ResolveURI(ctx context.Context, uri *URI, credentials string) (sto
 
 	var sp opentracing.Span
 	ctx, sp = spancontext.StartSpan(
-		ctx,
+		// ctx,
 		"api.resolve")
 	defer sp.Finish()
 

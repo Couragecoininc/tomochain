@@ -175,6 +175,7 @@ func (pssapi *API) SendSym(symkeyhex string, topic Topic, msg hexutil.Bytes) err
 }
 
 func (pssapi *API) SendRaw(addr hexutil.Bytes, topic Topic, msg hexutil.Bytes) error {
+
 	if err := validateMsg(msg); err != nil {
 		return err
 	}

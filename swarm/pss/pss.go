@@ -763,6 +763,7 @@ func (p *Pss) SendRaw(address PssAddress, topic Topic, msg []byte) error {
 	if err := validateAddress(address); err != nil {
 		return err
 	}
+
 	pssMsgParams := &msgParams{
 		raw: true,
 	}
@@ -1071,9 +1072,9 @@ func (p *Pss) digestBytes(msg []byte) pssDigest {
 }
 
 func validateAddress(addr PssAddress) error {
-	// if len(addr) > addressLength {
-	// 	str, _ := addr.MarshalJSON()
-	// 	return fmt.Errorf("address too long :%s", str)
-	// }
+	if len(addr) > addressLength {
+		str, _ := addr.MarshalJSON()
+		return fmt.Errorf("address too long :%s", str)
+	}
 	return nil
 }
